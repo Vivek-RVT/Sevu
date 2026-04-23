@@ -15,7 +15,7 @@ import {
   Globe, Plus, X, Wrench, BadgeCheck, DollarSign,
   CheckCircle2, ExternalLink, MapPin, AlertCircle, Instagram,
   Link, MessageCircle, Search, Phone, ChevronLeft, ChevronRight, Upload, Camera,
-  Pencil, Tag,
+  Pencil, Tag, FileText, Download,
 } from "lucide-react";
 import { CATEGORY_CONFIG, JOB_TYPE_ICONS } from "@/lib/categoryConfig";
 
@@ -450,6 +450,251 @@ export default function Settings() {
     onError: (err) => setUploadError(`Work photo: ${err.message}`),
   });
 
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const handleExportPDF = async () => {
+    if (exportingPdf) return;
+    setExportError(null);
+    setExportingPdf(true);
+    try {
+      const [customersRes, logsRes] = await Promise.all([
+        fetch(`/api/customers?businessId=${businessId}`).then(r => r.json()),
+        fetch(`/api/service-logs?businessId=${businessId}`).then(r => r.json()),
+      ]);
+      const customers: any[] = Array.isArray(customersRes) ? customersRes : [];
+      const logs: any[] = Array.isArray(logsRes) ? logsRes : [];
+
+      const logsByCustomer = new Map<number, any[]>();
+      for (const l of logs) {
+        const arr = logsByCustomer.get(l.customerId) || [];
+        arr.push(l);
+        logsByCustomer.set(l.customerId, arr);
+      }
+      for (const arr of logsByCustomer.values()) {
+        arr.sort((a, b) =>
+          new Date(b.serviceDate || 0).getTime() - new Date(a.serviceDate || 0).getTime()
+        );
+      }
+
+      const totalEarned = logs
+        .filter(l => l.paymentStatus === "paid")
+        .reduce((s, l) => s + (l.amount || 0), 0)
+        + logs
+          .filter(l => l.paymentStatus === "partial")
+          .reduce((s, l) => s + (l.paidAmount || 0), 0);
+      const totalDue = logs
+        .filter(l => l.paymentStatus === "pending")
+        .reduce((s, l) => s + (l.amount || 0), 0)
+        + logs
+          .filter(l => l.paymentStatus === "partial")
+          .reduce((s, l) => s + ((l.amount || 0) - (l.paidAmount || 0)), 0);
+
+      const esc = (s: any) =>
+        String(s ?? "").replace(/[&<>"']/g, c =>
+          ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!)
+        );
+      const fmtDate = (d: any) => {
+        if (!d) return "—";
+        try {
+          return new Date(d).toLocaleDateString("en-IN", {
+            day: "2-digit", month: "short", year: "numeric",
+          });
+        } catch { return String(d); }
+      };
+      const inr = (n: any) =>
+        n == null || n === 0 ? "—" : "₹" + Number(n).toLocaleString("en-IN");
+
+      const today = new Date().toLocaleDateString("en-IN", {
+        day: "2-digit", month: "long", year: "numeric",
+      });
+
+      const bizName = esc(business?.name || "Service Business");
+      const bizCategory = esc(business?.category || "");
+      const bizPhone = esc(business?.phone || "");
+      const bizAddress = esc(business?.address || "");
+
+      const customerSections = customers.map(c => {
+        const cLogs = logsByCustomer.get(c.id) || [];
+        const rows = cLogs.length === 0
+          ? `<tr><td colspan="5" class="empty">No services recorded</td></tr>`
+          : cLogs.map(l => {
+              const status = l.paymentStatus === "paid"
+                ? '<span class="badge paid">Paid</span>'
+                : l.paymentStatus === "partial"
+                  ? '<span class="badge partial">Partial</span>'
+                  : '<span class="badge pending">Pending</span>';
+              const amt = l.paymentStatus === "partial" && l.paidAmount != null
+                ? `${inr(l.paidAmount)} / ${inr(l.amount)}`
+                : inr(l.amount);
+              return `<tr>
+                <td>${fmtDate(l.serviceDate)}</td>
+                <td>${esc(l.service || "—")}</td>
+                <td class="num">${amt}</td>
+                <td>${status}</td>
+                <td>${esc(l.note || "")}</td>
+              </tr>`;
+            }).join("");
+
+        const earned = (c.totalSpent ?? 0);
+        const due = (c.outstandingBalance ?? 0);
+
+        return `
+          <section class="customer">
+            <header class="c-head">
+              <div>
+                <h2>${esc(c.name)}</h2>
+                <p class="c-meta">
+                  ${c.phone ? esc(c.phone) : '<span class="muted">No phone</span>'}
+                  ${c.address ? ` · ${esc(c.address)}` : ""}
+                </p>
+              </div>
+              <div class="c-totals">
+                <div><span class="lbl">Earned</span><span class="val green">${inr(earned)}</span></div>
+                ${due > 0 ? `<div><span class="lbl">Due</span><span class="val orange">${inr(due)}</span></div>` : ""}
+              </div>
+            </header>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:90px">Date</th>
+                  <th>Service</th>
+                  <th class="num" style="width:120px">Amount</th>
+                  <th style="width:80px">Status</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </section>
+        `;
+      }).join("");
+
+      const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Service History — ${bizName}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         color: #1f2937; margin: 0; padding: 32px 36px; background: #fff; font-size: 12px; }
+  .doc-head { display: flex; justify-content: space-between; align-items: flex-start;
+              border-bottom: 3px solid #6366f1; padding-bottom: 18px; margin-bottom: 24px; }
+  .doc-head h1 { margin: 0 0 4px 0; font-size: 24px; color: #111827; }
+  .doc-head .sub { color: #6b7280; font-size: 12px; line-height: 1.6; }
+  .doc-head .right { text-align: right; color: #6b7280; font-size: 11px; line-height: 1.6; }
+  .doc-head .right strong { color: #111827; font-size: 13px; display: block; margin-bottom: 2px; }
+
+  .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
+  .stat { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px 14px; }
+  .stat .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; font-weight: 700; }
+  .stat .val { display: block; font-size: 18px; font-weight: 700; color: #111827; margin-top: 4px; }
+  .stat .val.green { color: #059669; }
+  .stat .val.orange { color: #ea580c; }
+
+  .customer { margin-bottom: 22px; page-break-inside: avoid; }
+  .c-head { display: flex; justify-content: space-between; align-items: flex-end;
+            border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 8px; }
+  .c-head h2 { margin: 0; font-size: 15px; color: #111827; }
+  .c-meta { margin: 2px 0 0; color: #6b7280; font-size: 11px; }
+  .c-meta .muted { color: #9ca3af; font-style: italic; }
+  .c-totals { display: flex; gap: 18px; }
+  .c-totals > div { text-align: right; }
+  .c-totals .lbl { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; font-weight: 700; }
+  .c-totals .val { font-size: 13px; font-weight: 700; color: #111827; }
+  .c-totals .val.green { color: #059669; }
+  .c-totals .val.orange { color: #ea580c; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { text-align: left; background: #f3f4f6; color: #374151; font-weight: 700;
+       padding: 6px 8px; border-bottom: 1px solid #e5e7eb; }
+  td { padding: 6px 8px; border-bottom: 1px solid #f3f4f6; vertical-align: top; color: #1f2937; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.empty { text-align: center; color: #9ca3af; font-style: italic; padding: 12px; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; }
+  .badge.paid { background: #d1fae5; color: #065f46; }
+  .badge.partial { background: #ede9fe; color: #5b21b6; }
+  .badge.pending { background: #ffedd5; color: #9a3412; }
+
+  .footer { margin-top: 32px; padding-top: 14px; border-top: 1px solid #e5e7eb;
+            text-align: center; color: #9ca3af; font-size: 10px; }
+
+  .empty-state { text-align: center; padding: 40px; color: #9ca3af; font-size: 13px; }
+
+  @media print {
+    body { padding: 18mm 14mm; }
+    .no-print { display: none; }
+    .summary { page-break-after: avoid; }
+    .customer { break-inside: avoid; }
+  }
+  .print-bar { position: fixed; top: 12px; right: 12px; display: flex; gap: 8px; z-index: 10; }
+  .print-bar button { background: #6366f1; color: #fff; border: 0; padding: 10px 16px;
+                       border-radius: 10px; font-weight: 700; font-size: 12px; cursor: pointer;
+                       box-shadow: 0 4px 14px rgba(99,102,241,0.4); }
+  .print-bar button.secondary { background: #fff; color: #374151; border: 1px solid #d1d5db; box-shadow: none; }
+</style>
+</head>
+<body>
+  <div class="print-bar no-print">
+    <button class="secondary" onclick="window.close()">Close</button>
+    <button onclick="window.print()">Print / Save as PDF</button>
+  </div>
+
+  <header class="doc-head">
+    <div>
+      <h1>${bizName}</h1>
+      <div class="sub">
+        ${bizCategory ? esc(bizCategory) + "<br/>" : ""}
+        ${bizPhone ? esc(bizPhone) : ""}${bizPhone && bizAddress ? " · " : ""}${bizAddress ? esc(bizAddress) : ""}
+      </div>
+    </div>
+    <div class="right">
+      <strong>Service History Report</strong>
+      Generated: ${esc(today)}<br/>
+      Customers: ${customers.length} · Services: ${logs.length}
+    </div>
+  </header>
+
+  <div class="summary">
+    <div class="stat"><span class="lbl">Customers</span><span class="val">${customers.length}</span></div>
+    <div class="stat"><span class="lbl">Services Done</span><span class="val">${logs.length}</span></div>
+    <div class="stat"><span class="lbl">Total Earned</span><span class="val green">${inr(totalEarned)}</span></div>
+    <div class="stat"><span class="lbl">Outstanding</span><span class="val orange">${inr(totalDue)}</span></div>
+  </div>
+
+  ${customers.length === 0
+    ? `<div class="empty-state">No customers yet. Add customers and services to see your history.</div>`
+    : customerSections}
+
+  <div class="footer">
+    Generated by Sevu · ${esc(today)}
+  </div>
+
+  <script>
+    window.addEventListener("load", function () {
+      setTimeout(function () { window.print(); }, 350);
+    });
+  </script>
+</body>
+</html>`;
+
+      const w = window.open("", "_blank");
+      if (!w) {
+        setExportError("Please allow popups to export the PDF.");
+        return;
+      }
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
+    } catch (err: any) {
+      setExportError(err?.message || "Failed to export. Try again.");
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
   const [creatingProfile, setCreatingProfile] = useState(false);
@@ -667,6 +912,43 @@ export default function Settings() {
                       )}
                     </div>
                   )}
+                </div>
+
+                {/* ── Service History PDF Export ── */}
+                <div className="bg-card rounded-3xl p-5 border border-border/50 shadow-sm">
+                  <SectionHeader
+                    icon={<FileText className="w-5 h-5" />}
+                    title="Service History PDF"
+                    subtitle="Apne saare kaam ka record PDF mein nikaale"
+                  />
+                  <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
+                    Professional report jo har customer, service aur payment ka pura record
+                    dikhata hai. Apne records ke liye save karein ya client ko share karein.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={handleExportPDF}
+                    disabled={exportingPdf}
+                    className="w-full mt-4 py-3.5 rounded-2xl font-bold text-sm bg-gradient-to-r from-primary to-secondary text-white shadow-md hover:shadow-lg hover:shadow-primary/25 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-60"
+                  >
+                    {exportingPdf ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Preparing report...</>
+                    ) : (
+                      <><Download className="w-4 h-4" /> Export PDF</>
+                    )}
+                  </button>
+
+                  {exportError && (
+                    <div className="mt-3 px-3 py-2 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 text-xs text-red-600 dark:text-red-400 flex items-start gap-2">
+                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                      <span>{exportError}</span>
+                    </div>
+                  )}
+
+                  <p className="text-[11px] text-muted-foreground/70 mt-3 leading-relaxed">
+                    Tip: Print dialog mein "Save as PDF" choose karein.
+                  </p>
                 </div>
 
                 <button type="button" onClick={() => logout().then(() => setLocation("/app/login"))} 
