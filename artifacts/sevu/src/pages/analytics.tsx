@@ -9,7 +9,7 @@ import {
   BarChart3, Loader2, ExternalLink,
   ChevronRight, CheckCircle2, Camera, Pencil, X, Save,
   MapPin, Clock, Globe, Instagram, BadgeCheck, Wrench,
-  IndianRupee, Image as ImageIcon, Sparkles,
+  IndianRupee, Image as ImageIcon, Sparkles, User,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -62,26 +62,6 @@ async function compressImage(file: File, maxPx = 1200, quality = 0.82): Promise<
 const toPublicUrl = (objectPath: string) =>
   `/api/storage/profile-objects${objectPath.replace(/^\/objects/, "")}`;
 
-function StatCard({
-  icon, label, value, color, sublabel,
-}: {
-  icon: React.ReactNode; label: string; value: string | number;
-  color: string; sublabel?: string;
-}) {
-  return (
-    <div className={`rounded-2xl p-4 flex items-center gap-4 ${color}`}>
-      <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <p className="text-2xl font-display font-bold leading-tight">{value}</p>
-        <p className="text-sm font-semibold opacity-80 mt-0.5">{label}</p>
-        {sublabel && <p className="text-xs opacity-60 mt-0.5">{sublabel}</p>}
-      </div>
-    </div>
-  );
-}
-
 function StarRow({ rating }: { rating: number }) {
   return (
     <div className="flex gap-0.5">
@@ -95,10 +75,13 @@ function StarRow({ rating }: { rating: number }) {
 
 const inp = "w-full px-3.5 py-3 bg-background border-2 border-border rounded-xl focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all text-sm font-medium placeholder:text-muted-foreground/50";
 
+type Tab = "profile" | "analytics";
+
 export default function Analytics() {
   const { businessId } = useBusinessId();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const [tab, setTab] = useState<Tab>("profile");
 
   if (!businessId) return <Redirect to="/app/login" />;
 
@@ -126,7 +109,7 @@ export default function Analytics() {
 
   const isLoading = loadingProfiles || loadingAnalytics;
 
-  // ── Edit modal state ──────────────────────────────────────────
+  // ── Edit modal state ─────────────────────────────────────────
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -178,7 +161,7 @@ export default function Analytics() {
     }
   };
 
-  // ── Image uploads ─────────────────────────────────────────────
+  // ── Image uploads ────────────────────────────────────────────
   const [uploadingProfile, setUploadingProfile] = useState(false);
   const [uploadingShop, setUploadingShop] = useState(false);
   const profileInput = useRef<HTMLInputElement>(null);
@@ -247,8 +230,8 @@ export default function Analytics() {
         {!isLoading && !myProfile && (
           <>
             <div className="bg-gradient-to-br from-primary to-secondary text-white px-4 pt-5 pb-6">
-              <h1 className="text-2xl font-display font-bold">Profile Analytics</h1>
-              <p className="text-white/70 text-xs mt-0.5">Dekho kitne log aapko dhoondh rahe hain</p>
+              <h1 className="text-2xl font-display font-bold">My Profile</h1>
+              <p className="text-white/70 text-xs mt-0.5">Apna public profile setup karo</p>
             </div>
             <div className="flex flex-col items-center justify-center py-12 text-center px-6">
               <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center mb-5">
@@ -256,7 +239,7 @@ export default function Analytics() {
               </div>
               <h3 className="text-xl font-display font-bold mb-2">Profile nahi bana abhi tak</h3>
               <p className="text-muted-foreground text-sm max-w-[240px] leading-relaxed mb-6">
-                Directory mein list hone ke liye apna public profile setup karo — phir yahan analytics dikhega
+                Directory mein list hone ke liye apna public profile setup karo
               </p>
               <button onClick={() => setLocation("/app/settings")}
                 className="px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 flex items-center gap-2 active:scale-95 transition-all">
@@ -271,7 +254,7 @@ export default function Analytics() {
             {/* ── BANNER + LOGO HEADER ─────────────────────── */}
             <div className="relative">
               {/* Banner */}
-              <div className="relative h-44 overflow-hidden bg-gradient-to-br from-primary via-purple-500 to-secondary">
+              <div className="relative h-40 overflow-hidden bg-gradient-to-br from-primary via-purple-500 to-secondary">
                 {myProfile.shopImage ? (
                   <img src={myProfile.shopImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
                 ) : (
@@ -282,7 +265,6 @@ export default function Analytics() {
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
 
-                {/* Banner edit btn */}
                 <button onClick={() => shopInput.current?.click()} disabled={uploadingShop}
                   className="absolute top-3 right-3 bg-black/55 hover:bg-black/75 backdrop-blur-md text-white text-xs font-bold px-3 py-2 rounded-full flex items-center gap-1.5 active:scale-95 transition disabled:opacity-60">
                   {uploadingShop
@@ -317,246 +299,277 @@ export default function Analytics() {
                 </button>
               </div>
 
-              {/* Name + meta */}
+              {/* Name + meta — clean spacing */}
               <div className="px-4 mt-3">
-                <h1 className="text-xl font-display font-bold leading-tight">{myProfile.name}</h1>
-                <div className="flex items-center gap-2 flex-wrap mt-1">
-                  <span className="text-sm text-muted-foreground font-semibold">{myProfile.service}</span>
+                <h1 className="text-2xl font-display font-bold leading-tight">{myProfile.name}</h1>
+                <p className="text-sm text-muted-foreground font-semibold mt-0.5">
+                  {myProfile.service}
                   {myProfile.city && (
-                    <>
-                      <span className="text-muted-foreground/40">·</span>
-                      <span className="text-sm text-muted-foreground flex items-center gap-1">
-                        <MapPin className="w-3 h-3" />{myProfile.city}
-                      </span>
-                    </>
+                    <> · <span className="inline-flex items-center gap-0.5">
+                      <MapPin className="w-3 h-3 inline" />{myProfile.city}
+                    </span></>
                   )}
-                  {myProfile.yearsExperience && (
-                    <>
-                      <span className="text-muted-foreground/40">·</span>
-                      <span className="text-sm text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
-                        <BadgeCheck className="w-3.5 h-3.5" />{myProfile.yearsExperience}+ yrs
-                      </span>
-                    </>
-                  )}
-                </div>
+                </p>
 
-                {/* Quick rating chips */}
-                <div className="flex items-center gap-3 mt-3 text-xs">
+                {/* Rating + jobs + experience — wide spacing */}
+                <div className="flex items-center gap-5 mt-3 text-sm">
                   <div className="flex items-center gap-1">
-                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                    <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
                     <span className="font-bold">{analytics.rating > 0 ? analytics.rating.toFixed(1) : "—"}</span>
-                    <span className="text-muted-foreground">({analytics.totalReviews})</span>
+                    <span className="text-muted-foreground text-xs">({analytics.totalReviews})</span>
                   </div>
-                  <span className="text-muted-foreground/40">·</span>
-                  <span className="text-muted-foreground font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-primary" />{analytics.totalJobs} jobs
-                  </span>
-                  <span className="text-muted-foreground/40">·</span>
-                  <span className="text-muted-foreground font-semibold flex items-center gap-1">
-                    <Eye className="w-3.5 h-3.5" />{analytics.viewCount} views
-                  </span>
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <CheckCircle2 className="w-4 h-4 text-primary" />
+                    <span className="font-semibold">{analytics.totalJobs}</span>
+                    <span className="text-xs">jobs</span>
+                  </div>
+                  {myProfile.yearsExperience && (
+                    <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                      <BadgeCheck className="w-4 h-4" />
+                      <span className="font-semibold">{myProfile.yearsExperience}+</span>
+                      <span className="text-xs">yrs</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Body */}
-            <div className="flex-1 px-4 pt-5 space-y-4">
-
-              {/* Public link */}
-              <a href={`/profile/${analytics.slug}`} target="_blank" rel="noopener noreferrer"
-                className="bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20 rounded-2xl px-4 py-3 flex items-center justify-between gap-2 hover:from-primary/15 hover:to-secondary/15 active:scale-[0.99] transition">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-9 h-9 bg-primary/15 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Sparkles className="w-4 h-4 text-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-bold text-xs">View Public Profile</p>
-                    <p className="text-[11px] text-muted-foreground truncate">/profile/{analytics.slug}</p>
-                  </div>
-                </div>
-                <ExternalLink className="w-4 h-4 text-primary flex-shrink-0" />
-              </a>
-
-              {/* ── ANALYTICS SECTION ── */}
-              <div>
-                <h2 className="font-display font-bold text-base mb-2 px-1 flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-primary" /> Engagement
-                </h2>
-                <div className="space-y-3">
-                  <StatCard icon={<Eye className="w-6 h-6 text-white" />}
-                    label="Profile Dekha" value={analytics.viewCount}
-                    color="bg-gradient-to-r from-blue-500 to-blue-600 text-white"
-                    sublabel="Log aapka page dekh chuke hain" />
-                  <StatCard icon={<MessageCircle className="w-6 h-6 text-white" />}
-                    label="WhatsApp pe Aaye" value={analytics.whatsappClicks}
-                    color="bg-gradient-to-r from-[#25D366] to-[#1da851] text-white"
-                    sublabel="WhatsApp button dabaya" />
-                  <StatCard icon={<Phone className="w-6 h-6 text-white" />}
-                    label="Phone pe Click" value={analytics.callClicks}
-                    color="bg-gradient-to-r from-violet-500 to-violet-600 text-white"
-                    sublabel="Call karne ki koshish ki" />
-                </div>
+            {/* ── TABS ─────────────────────────────────────── */}
+            <div className="px-4 mt-5">
+              <div className="bg-muted/50 rounded-2xl p-1 flex gap-1">
+                <button onClick={() => setTab("profile")}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-1.5
+                    ${tab === "profile" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                  <User className="w-4 h-4" /> Profile
+                </button>
+                <button onClick={() => setTab("analytics")}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-1.5
+                    ${tab === "analytics" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                  <BarChart3 className="w-4 h-4" /> Analytics
+                </button>
               </div>
+            </div>
 
-              {/* ── ABOUT ── */}
-              {myProfile.description ? (
-                <div className="bg-card border border-border/50 rounded-2xl p-4">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">About</p>
-                  <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-line">{myProfile.description}</p>
-                </div>
-              ) : (
-                <button onClick={() => setEditing(true)}
-                  className="w-full bg-card border border-dashed border-border rounded-2xl p-4 text-left hover:border-primary/40 transition">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">About</p>
-                  <p className="text-sm text-muted-foreground/70 italic mt-1">+ Add a description so customers know you better</p>
-                </button>
-              )}
-
-              {/* ── SERVICES ── */}
-              {services.length > 0 ? (
-                <div className="bg-card border border-border/50 rounded-2xl p-4">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
-                    <Wrench className="w-3 h-3" /> Services Offered
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {services.map((s, i) => (
-                      <span key={i} className="text-xs font-semibold bg-primary/10 text-primary px-3 py-1.5 rounded-full">
-                        {s}
-                      </span>
-                    ))}
+            {/* ── TAB: PROFILE ─────────────────────────────── */}
+            {tab === "profile" && (
+              <div className="flex-1 px-4 pt-4 space-y-3">
+                {/* Public link */}
+                <a href={`/profile/${analytics.slug}`} target="_blank" rel="noopener noreferrer"
+                  className="bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20 rounded-2xl px-4 py-3 flex items-center justify-between gap-2 hover:from-primary/15 hover:to-secondary/15 active:scale-[0.99] transition">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-9 h-9 bg-primary/15 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Sparkles className="w-4 h-4 text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-xs">View Public Profile</p>
+                      <p className="text-[11px] text-muted-foreground truncate">/profile/{analytics.slug}</p>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <button onClick={() => setEditing(true)}
-                  className="w-full bg-card border border-dashed border-border rounded-2xl p-4 text-left hover:border-primary/40 transition">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Services Offered</p>
-                  <p className="text-sm text-muted-foreground/70 italic mt-1">+ List the services you offer</p>
-                </button>
-              )}
+                  <ExternalLink className="w-4 h-4 text-primary flex-shrink-0" />
+                </a>
 
-              {/* ── HOURS / PRICING ── */}
-              {(myProfile.openingHours || myProfile.priceRange) && (
-                <div className="grid grid-cols-2 gap-3">
-                  {myProfile.openingHours && (
-                    <div className="bg-card border border-border/50 rounded-2xl p-3.5">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Hours</p>
-                      </div>
-                      <p className="text-sm font-semibold leading-tight">{myProfile.openingHours}</p>
-                    </div>
-                  )}
-                  {myProfile.priceRange && (
-                    <div className="bg-card border border-border/50 rounded-2xl p-3.5">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <IndianRupee className="w-3.5 h-3.5 text-muted-foreground" />
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Price Range</p>
-                      </div>
-                      <p className="text-sm font-semibold leading-tight">{myProfile.priceRange}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ── CONTACT ── */}
-              {(myProfile.whatsapp || myProfile.website || myProfile.instagram || myProfile.address) && (
-                <div className="bg-card border border-border/50 rounded-2xl p-4 space-y-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Contact</p>
-                  {myProfile.whatsapp && (
-                    <div className="flex items-center gap-2.5">
-                      <MessageCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
-                      <span className="text-sm font-medium">{myProfile.whatsapp}</span>
-                    </div>
-                  )}
-                  {myProfile.website && (
-                    <div className="flex items-center gap-2.5">
-                      <Globe className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                      <span className="text-sm font-medium truncate">{myProfile.website}</span>
-                    </div>
-                  )}
-                  {myProfile.instagram && (
-                    <div className="flex items-center gap-2.5">
-                      <Instagram className="w-4 h-4 text-pink-600 flex-shrink-0" />
-                      <span className="text-sm font-medium">@{myProfile.instagram.replace(/^@/, "")}</span>
-                    </div>
-                  )}
-                  {myProfile.address && (
-                    <div className="flex items-start gap-2.5">
-                      <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                      <span className="text-sm font-medium leading-snug">{myProfile.address}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ── WORK GALLERY (preview) ── */}
-              {myProfile.workImages && myProfile.workImages.length > 0 && (
-                <div className="bg-card border border-border/50 rounded-2xl p-4">
-                  <div className="flex items-center justify-between mb-2.5">
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-                      <ImageIcon className="w-3 h-3" /> Work Photos ({myProfile.workImages.length})
-                    </p>
-                    <button onClick={() => setLocation("/app/settings")} className="text-[11px] font-bold text-primary">
-                      Manage →
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {myProfile.workImages.slice(0, 8).map((url: string, i: number) => (
-                      <div key={i} className="aspect-square rounded-lg overflow-hidden bg-muted">
-                        <img src={url} alt="" className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* ── REVIEWS ── */}
-              <div>
-                <h2 className="font-display font-bold text-base mb-2 px-1 flex items-center gap-2">
-                  <Star className="w-4 h-4 text-amber-400 fill-amber-400" /> Recent Reviews
-                </h2>
-
-                {analytics.reviews.length === 0 ? (
-                  <div className="bg-card border border-dashed border-border/60 rounded-2xl py-8 text-center">
-                    <Star className="w-9 h-9 text-muted-foreground mx-auto mb-2 opacity-30" />
-                    <p className="font-medium text-sm text-foreground">Abhi tak koi review nahi</p>
-                    <p className="text-xs text-muted-foreground mt-1">Customers ko apna profile link bhejo</p>
+                {/* About */}
+                {myProfile.description ? (
+                  <div className="bg-card border border-border/50 rounded-2xl p-4">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">About</p>
+                    <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-line">{myProfile.description}</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {analytics.reviews.map(r => (
-                      <div key={r.id} className="bg-card border border-border/50 rounded-2xl p-4">
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-9 h-9 bg-primary/10 rounded-full flex items-center justify-center font-bold text-primary text-sm flex-shrink-0">
-                              {r.reviewerName.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <p className="font-bold text-sm">{r.reviewerName}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {format(new Date(r.createdAt), "d MMM, yyyy")}
-                              </p>
-                            </div>
-                          </div>
-                          <StarRow rating={r.rating} />
+                  <button onClick={() => setEditing(true)}
+                    className="w-full bg-card border border-dashed border-border rounded-2xl p-4 text-left hover:border-primary/40 transition">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">About</p>
+                    <p className="text-sm text-muted-foreground/70 italic mt-1">+ Add a description so customers know you better</p>
+                  </button>
+                )}
+
+                {/* Services */}
+                {services.length > 0 ? (
+                  <div className="bg-card border border-border/50 rounded-2xl p-4">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
+                      <Wrench className="w-3 h-3" /> Services Offered
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {services.map((s, i) => (
+                        <span key={i} className="text-xs font-semibold bg-primary/10 text-primary px-3 py-1.5 rounded-full">
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setEditing(true)}
+                    className="w-full bg-card border border-dashed border-border rounded-2xl p-4 text-left hover:border-primary/40 transition">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Services Offered</p>
+                    <p className="text-sm text-muted-foreground/70 italic mt-1">+ List the services you offer</p>
+                  </button>
+                )}
+
+                {/* Hours / Pricing */}
+                {(myProfile.openingHours || myProfile.priceRange) && (
+                  <div className="grid grid-cols-2 gap-3">
+                    {myProfile.openingHours && (
+                      <div className="bg-card border border-border/50 rounded-2xl p-3.5">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Hours</p>
                         </div>
-                        {r.comment && (
-                          <p className="text-sm text-foreground/80 leading-relaxed">{r.comment}</p>
-                        )}
+                        <p className="text-sm font-semibold leading-tight">{myProfile.openingHours}</p>
                       </div>
-                    ))}
+                    )}
+                    {myProfile.priceRange && (
+                      <div className="bg-card border border-border/50 rounded-2xl p-3.5">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <IndianRupee className="w-3.5 h-3.5 text-muted-foreground" />
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Price Range</p>
+                        </div>
+                        <p className="text-sm font-semibold leading-tight">{myProfile.priceRange}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Contact */}
+                {(myProfile.whatsapp || myProfile.website || myProfile.instagram || myProfile.address) && (
+                  <div className="bg-card border border-border/50 rounded-2xl p-4 space-y-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Contact</p>
+                    {myProfile.whatsapp && (
+                      <div className="flex items-center gap-2.5">
+                        <MessageCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                        <span className="text-sm font-medium">{myProfile.whatsapp}</span>
+                      </div>
+                    )}
+                    {myProfile.website && (
+                      <div className="flex items-center gap-2.5">
+                        <Globe className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                        <span className="text-sm font-medium truncate">{myProfile.website}</span>
+                      </div>
+                    )}
+                    {myProfile.instagram && (
+                      <div className="flex items-center gap-2.5">
+                        <Instagram className="w-4 h-4 text-pink-600 flex-shrink-0" />
+                        <span className="text-sm font-medium">@{myProfile.instagram.replace(/^@/, "")}</span>
+                      </div>
+                    )}
+                    {myProfile.address && (
+                      <div className="flex items-start gap-2.5">
+                        <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                        <span className="text-sm font-medium leading-snug">{myProfile.address}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Work gallery */}
+                {myProfile.workImages && myProfile.workImages.length > 0 && (
+                  <div className="bg-card border border-border/50 rounded-2xl p-4">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                        <ImageIcon className="w-3 h-3" /> Work Photos ({myProfile.workImages.length})
+                      </p>
+                      <button onClick={() => setLocation("/app/settings")} className="text-[11px] font-bold text-primary">
+                        Manage →
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {myProfile.workImages.slice(0, 8).map((url: string, i: number) => (
+                        <div key={i} className="aspect-square rounded-lg overflow-hidden bg-muted">
+                          <img src={url} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
+            )}
 
-              {/* Tip */}
-              <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200/60 rounded-2xl px-4 py-3 flex gap-3 items-start">
-                <TrendingUp className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-amber-700 dark:text-amber-400 font-medium leading-relaxed">
-                  <span className="font-bold">Tip:</span> Har customer ko profile link bhejo WhatsApp pe — views aur reviews dono badhenge
-                </p>
+            {/* ── TAB: ANALYTICS ───────────────────────────── */}
+            {tab === "analytics" && (
+              <div className="flex-1 px-4 pt-4 space-y-4">
+                {/* Compact 3-col engagement */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl p-3 flex flex-col items-center justify-center text-center">
+                    <Eye className="w-5 h-5 opacity-90 mb-1.5" />
+                    <p className="text-2xl font-display font-bold leading-none">{analytics.viewCount}</p>
+                    <p className="text-[10px] font-semibold opacity-85 mt-1 uppercase tracking-wide">Views</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-[#25D366] to-[#1da851] text-white rounded-2xl p-3 flex flex-col items-center justify-center text-center">
+                    <MessageCircle className="w-5 h-5 opacity-90 mb-1.5" />
+                    <p className="text-2xl font-display font-bold leading-none">{analytics.whatsappClicks}</p>
+                    <p className="text-[10px] font-semibold opacity-85 mt-1 uppercase tracking-wide">WhatsApp</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-violet-500 to-violet-600 text-white rounded-2xl p-3 flex flex-col items-center justify-center text-center">
+                    <Phone className="w-5 h-5 opacity-90 mb-1.5" />
+                    <p className="text-2xl font-display font-bold leading-none">{analytics.callClicks}</p>
+                    <p className="text-[10px] font-semibold opacity-85 mt-1 uppercase tracking-wide">Calls</p>
+                  </div>
+                </div>
+
+                {/* Stat strip — rating / reviews / jobs */}
+                <div className="bg-card border border-border/50 rounded-2xl p-4 grid grid-cols-3 divide-x divide-border/50">
+                  <div className="text-center pr-3">
+                    <p className="text-2xl font-display font-bold text-amber-500">
+                      {analytics.rating > 0 ? analytics.rating.toFixed(1) : "—"}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground font-semibold mt-0.5">Rating</p>
+                  </div>
+                  <div className="text-center px-3">
+                    <p className="text-2xl font-display font-bold text-foreground">{analytics.totalReviews}</p>
+                    <p className="text-[11px] text-muted-foreground font-semibold mt-0.5">Reviews</p>
+                  </div>
+                  <div className="text-center pl-3">
+                    <p className="text-2xl font-display font-bold text-foreground">{analytics.totalJobs}</p>
+                    <p className="text-[11px] text-muted-foreground font-semibold mt-0.5">Jobs</p>
+                  </div>
+                </div>
+
+                {/* Reviews */}
+                <div>
+                  <h2 className="font-display font-bold text-base mb-2 px-1 flex items-center gap-2">
+                    <Star className="w-4 h-4 text-amber-400 fill-amber-400" /> Recent Reviews
+                  </h2>
+
+                  {analytics.reviews.length === 0 ? (
+                    <div className="bg-card border border-dashed border-border/60 rounded-2xl py-8 text-center">
+                      <Star className="w-9 h-9 text-muted-foreground mx-auto mb-2 opacity-30" />
+                      <p className="font-medium text-sm text-foreground">Abhi tak koi review nahi</p>
+                      <p className="text-xs text-muted-foreground mt-1">Customers ko apna profile link bhejo</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {analytics.reviews.map(r => (
+                        <div key={r.id} className="bg-card border border-border/50 rounded-2xl p-4">
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-9 h-9 bg-primary/10 rounded-full flex items-center justify-center font-bold text-primary text-sm flex-shrink-0">
+                                {r.reviewerName.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="font-bold text-sm">{r.reviewerName}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {format(new Date(r.createdAt), "d MMM, yyyy")}
+                                </p>
+                              </div>
+                            </div>
+                            <StarRow rating={r.rating} />
+                          </div>
+                          {r.comment && (
+                            <p className="text-sm text-foreground/80 leading-relaxed">{r.comment}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Tip */}
+                <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200/60 rounded-2xl px-4 py-3 flex gap-3 items-start">
+                  <TrendingUp className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-700 dark:text-amber-400 font-medium leading-relaxed">
+                    <span className="font-bold">Tip:</span> Har customer ko profile link bhejo WhatsApp pe — views aur reviews dono badhenge
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
           </>
         )}
       </div>
@@ -567,7 +580,6 @@ export default function Analytics() {
           onClick={() => !saving && setEditing(false)}>
           <div className="bg-card w-full sm:max-w-lg sm:rounded-3xl rounded-t-3xl shadow-2xl border border-border/50 max-h-[92vh] overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
             onClick={e => e.stopPropagation()}>
-            {/* Header */}
             <div className="px-5 py-4 border-b border-border/50 flex items-center justify-between">
               <div>
                 <h2 className="font-display font-bold text-lg">Edit Profile</h2>
@@ -579,7 +591,6 @@ export default function Analytics() {
               </button>
             </div>
 
-            {/* Body */}
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
               <div>
                 <label className="text-xs font-bold text-foreground mb-1.5 block">Description</label>
@@ -671,7 +682,6 @@ export default function Analytics() {
               </button>
             </div>
 
-            {/* Footer */}
             <div className="px-5 py-3 border-t border-border/50 flex gap-2">
               <button onClick={() => setEditing(false)} disabled={saving}
                 className="flex-1 py-3 rounded-xl font-bold text-sm bg-muted text-foreground hover:bg-muted/80 active:scale-[0.98] transition disabled:opacity-50">

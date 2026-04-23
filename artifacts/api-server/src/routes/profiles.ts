@@ -34,11 +34,26 @@ const trackLimiter = rateLimit({
 const router: IRouter = Router();
 
 function generateSlug(name: string, service: string, city: string): string {
-  return [name, service, city]
-    .join("-")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  const norm = (s: string) =>
+    s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+  const nameSlug = norm(name);
+  const serviceSlug = norm(service);
+  const citySlug = norm(city);
+
+  // Skip the service segment entirely if it's already inside the name
+  // (avoids "vivek-ac-repair" + "ac-repair" → "vivek-ac-repair-ac-repair")
+  const parts = [nameSlug];
+  if (serviceSlug && !nameSlug.includes(serviceSlug)) parts.push(serviceSlug);
+  if (citySlug && !nameSlug.includes(citySlug)) parts.push(citySlug);
+
+  // Final pass: collapse any remaining repeated adjacent tokens
+  const tokens = parts.join("-").split("-").filter(Boolean);
+  const dedup: string[] = [];
+  for (const t of tokens) {
+    if (dedup[dedup.length - 1] !== t) dedup.push(t);
+  }
+  return dedup.join("-");
 }
 
 function formatProfile(p: typeof profilesTable.$inferSelect) {
