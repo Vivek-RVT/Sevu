@@ -1,7 +1,3 @@
-export type CustomFetchOptions = RequestInit & {
-  responseType?: "json" | "text" | "blob" | "auto";
-};
-
 export type ErrorType<T = unknown> = ApiError<T>;
 
 export type BodyType<T> = T;
@@ -17,6 +13,14 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
+
+/** Called before retrying after a successful token refresh. */
+type RefreshHandler = () => Promise<boolean>;
+let _refreshHandler: RefreshHandler | null = null;
+
+/** Called when a refresh attempt fails — typically triggers logout + redirect. */
+type AuthFailedHandler = () => void;
+let _onAuthFailed: AuthFailedHandler | null = null;
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -36,12 +40,30 @@ export function setBaseUrl(url: string | null): void {
  *
  * Useful for Expo bundles making token-gated API calls.
  * Pass `null` to clear the getter.
- *
- * NOTE: This function should never be used in web applications where session
- * token cookies are automatically associated with API calls by the browser.
  */
 export function setAuthTokenGetter(getter: AuthTokenGetter | null): void {
   _authTokenGetter = getter;
+}
+
+/**
+ * Register a refresh handler.
+ * When any request receives a 401, this is called to silently renew the
+ * access token (e.g. POST /auth/refresh).  If it returns true, the original
+ * request is retried once.  If false, `onAuthFailed` is called instead.
+ *
+ * The handler is responsible for preventing concurrent refresh calls
+ * (e.g. by returning the same in-flight promise to all callers).
+ */
+export function setRefreshHandler(handler: RefreshHandler | null): void {
+  _refreshHandler = handler;
+}
+
+/**
+ * Register a handler that is called when token refresh fails.
+ * Typically: clear auth state and redirect to /login.
+ */
+export function setOnAuthFailed(handler: AuthFailedHandler | null): void {
+  _onAuthFailed = handler;
 }
 
 function isRequest(input: RequestInfo | URL): input is Request {
@@ -322,12 +344,27 @@ async function parseSuccessBody(
   }
 }
 
+/**
+ * Returns true if the given request URL is the refresh endpoint itself.
+ * We must NEVER retry the refresh call — that would cause an infinite loop.
+ */
+function isRefreshEndpoint(input: RequestInfo | URL): boolean {
+  const url = resolveUrl(input);
+  return url.includes("/auth/refresh");
+}
+
+export type CustomFetchOptions = RequestInit & {
+  responseType?: "json" | "text" | "blob" | "auto";
+  /** @internal — set to true when retrying after a token refresh to prevent loops */
+  _isRetry?: boolean;
+};
+
 export async function customFetch<T = unknown>(
   input: RequestInfo | URL,
   options: CustomFetchOptions = {},
 ): Promise<T> {
   input = applyBaseUrl(input);
-  const { responseType = "auto", headers: headersInit, ...init } = options;
+  const { responseType = "auto", headers: headersInit, _isRetry = false, ...init } = options;
 
   const method = resolveMethod(input, init.method);
 
@@ -360,9 +397,32 @@ export async function customFetch<T = unknown>(
 
   const requestInfo = { method, url: resolveUrl(input) };
 
-  const response = await fetch(input, { ...init, method, headers });
+  const response = await fetch(input, { ...init, method, headers, credentials: "include" });
 
   if (!response.ok) {
+    // ── 401 Auto-Refresh + Retry ─────────────────────────────────────────────
+    // Attempt a silent token refresh if:
+    //   1. The response is 401 Unauthorized
+    //   2. A refresh handler is registered
+    //   3. This isn't already a retry (prevents infinite loops)
+    //   4. The failed request is not the refresh endpoint itself
+    if (
+      response.status === 401 &&
+      _refreshHandler &&
+      !_isRetry &&
+      !isRefreshEndpoint(input)
+    ) {
+      const refreshed = await _refreshHandler();
+
+      if (refreshed) {
+        // New access-token cookie is now set — retry the original request once
+        return customFetch<T>(input, { ...options, _isRetry: true });
+      } else {
+        // Refresh failed — session is over
+        _onAuthFailed?.();
+      }
+    }
+
     const errorData = await parseErrorBody(response, method);
     throw new ApiError(response, errorData, requestInfo);
   }

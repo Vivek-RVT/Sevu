@@ -1,0 +1,21 @@
+packages:
+  "framer-motion": "Smooth page transitions and mobile-feel micro-interactions"
+  "date-fns": "Easy date manipulation and human-readable formatting"
+  "@hookform/resolvers": "Zod validation integration for robust forms"
+  "clsx": "Utility for constructing className strings conditionally"
+  "tailwind-merge": "Utility for merging tailwind classes without conflicts"
+
+images:
+  - path: "artifacts/sevu/public/images/welcome-hero.png"
+    description: "A friendly, warm, modern 3D illustration of a small local business storefront (like a salon or cafe) with a smiling character waving. Vibrant coral and teal colors on a transparent or soft off-white background."
+    aspect_ratio: "1:1"
+  - path: "artifacts/sevu/public/images/logo.png"
+    description: "A minimal, modern geometric logo mark for a SaaS app named Sevu, using warm coral and teal colors. Clean, friendly, scalable icon on a transparent background."
+    aspect_ratio: "1:1"
+  - path: "artifacts/sevu/public/images/empty-customers.png"
+    description: "A clean, minimal illustration of an empty contact list or address book, with a magnifying glass. Warm, playful 3D style."
+    aspect_ratio: "1:1"
+
+notes:
+  - "Assuming @workspace/api-client-react provides the generated TanStack Query hooks based on the OpenAPI spec."
+  - "LocalStorage is used to persist the active businessId ('sevuBusinessId')."

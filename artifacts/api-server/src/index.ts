@@ -1,5 +1,18 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { OTP_CONFIG } from "./config/otp.js";
+
+// ── Startup Security Checks ──────────────────────────────────────────────────
+
+const DEFAULT_JWT_SECRET = "sevu-dev-secret-change-in-production";
+if (OTP_CONFIG.JWT_SECRET === DEFAULT_JWT_SECRET) {
+  if (process.env.NODE_ENV === "production") {
+    logger.error("FATAL: JWT_SECRET is set to the insecure default value in production. Refusing to start.");
+    process.exit(1);
+  } else {
+    logger.warn("WARNING: JWT_SECRET is using the insecure default. Set JWT_SECRET env var before deploying.");
+  }
+}
 
 const rawPort = process.env["PORT"];
 

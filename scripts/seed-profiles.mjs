@@ -1,0 +1,218 @@
+import pg from "/home/runner/workspace/node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/index.js";
+
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+
+const dummyProfiles = [
+  {
+    name: "Rajan's Salon",
+    slug: "rajans-salon-salon-barbershop-mumbai",
+    phone: "+919876543210",
+    service: "Salon / Barbershop",
+    city: "Mumbai",
+    address: "Shop 12, Andheri West, Mumbai, Maharashtra 400058",
+    lat: 19.1364,
+    lng: 72.8296,
+    profileImage: "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=400&fit=crop",
+    shopImage: "https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?w=1200&h=675&fit=crop",
+    description: "Premium salon experience with 10+ years of expertise. We specialize in modern haircuts, beard grooming, and skin treatments. Walk-ins welcome!",
+    workImages: [
+      "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=800&h=600&fit=crop",
+      "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=800&h=600&fit=crop",
+      "https://images.unsplash.com/photo-1562322140-8baeececf3df?w=800&h=600&fit=crop",
+      "https://images.unsplash.com/photo-1605497788044-5a32c7078486?w=800&h=600&fit=crop",
+    ],
+    priceRange: "₹200 – ₹1500",
+    isAvailable24x7: false,
+    yearsExperience: 10,
+    servicesOffered: "Haircut, Beard Trim, Shave, Hair Color, Facial, Head Massage, Keratin Treatment",
+    certifications: "L'Oréal Certified, Wella Professional",
+    openingHours: "Mon–Sat: 9am–9pm, Sun: 10am–7pm",
+    website: "rajanssalon.in",
+    instagram: "rajanssalon",
+    whatsapp: "+919876543210",
+    rating: 4.7,
+    totalReviews: 38,
+    totalJobs: 520,
+    viewCount: 1240,
+    callClicks: 87,
+    whatsappClicks: 143,
+  },
+  {
+    name: "Sharma Electricals",
+    slug: "sharma-electricals-electrician-delhi",
+    phone: "+918765432109",
+    service: "Electrician",
+    city: "Delhi",
+    address: "Plot 45, Lajpat Nagar, New Delhi, Delhi 110024",
+    lat: 28.5665,
+    lng: 77.2431,
+    profileImage: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=400&h=400&fit=crop",
+    shopImage: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&h=675&fit=crop",
+    description: "Licensed electrician with 15 years experience. Available for residential and commercial wiring, panel upgrades, CCTV installation, and emergency repairs. 24/7 emergency service.",
+    workImages: [
+      "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&h=600&fit=crop",
+      "https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=800&h=600&fit=crop",
+      "https://images.unsplash.com/photo-1555664424-778a1e5e1b48?w=800&h=600&fit=crop",
+    ],
+    priceRange: "₹500 – ₹5000",
+    isAvailable24x7: true,
+    yearsExperience: 15,
+    servicesOffered: "House Wiring, Fan & AC Installation, CCTV, MCB Panel, Solar Setup, Emergency Repair",
+    certifications: "Government Licensed Electrician, ISI Certified",
+    openingHours: "Mon–Sun: 24 Hours",
+    website: null,
+    instagram: "sharmaelectricals_delhi",
+    whatsapp: "+918765432109",
+    rating: 4.5,
+    totalReviews: 62,
+    totalJobs: 890,
+    viewCount: 2100,
+    callClicks: 215,
+    whatsappClicks: 178,
+  },
+  {
+    name: "Dr. Priya Mehta Clinic",
+    slug: "dr-priya-mehta-clinic-doctor-bangalore",
+    phone: "+917654321098",
+    service: "Doctor / Clinic",
+    city: "Bangalore",
+    address: "103, Indiranagar 12th Main, Bengaluru, Karnataka 560038",
+    lat: 12.9784,
+    lng: 77.6408,
+    profileImage: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&h=400&fit=crop",
+    shopImage: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=1200&h=675&fit=crop",
+    description: "MBBS, MD (General Medicine). Providing compassionate healthcare to patients for over 12 years. Specializing in diabetes management, hypertension, and preventive health checkups.",
+    workImages: [
+      "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=800&h=600&fit=crop",
+      "https://images.unsplash.com/photo-1504813184591-01572f98c85f?w=800&h=600&fit=crop",
+    ],
+    priceRange: "₹400 – ₹800",
+    isAvailable24x7: false,
+    yearsExperience: 12,
+    servicesOffered: "General Consultation, Diabetes Care, Hypertension, Skin Allergy, Fever & Cold, Health Checkup",
+    certifications: "MBBS (AIIMS), MD General Medicine, Indian Medical Association Member",
+    openingHours: "Mon–Sat: 9am–1pm & 5pm–8pm",
+    website: "drpriyamehta.com",
+    instagram: null,
+    whatsapp: "+917654321098",
+    rating: 4.9,
+    totalReviews: 94,
+    totalJobs: 2400,
+    viewCount: 3750,
+    callClicks: 420,
+    whatsappClicks: 310,
+  },
+  {
+    name: "FitZone Gym",
+    slug: "fitzone-gym-gym-fitness-pune",
+    phone: "+916543210987",
+    service: "Gym / Fitness",
+    city: "Pune",
+    address: "D-Wing, Kalyani Nagar, Pune, Maharashtra 411006",
+    lat: 18.5462,
+    lng: 73.9006,
+    profileImage: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&h=400&fit=crop",
+    shopImage: "https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=1200&h=675&fit=crop",
+    description: "State-of-the-art gym with premium equipment, certified personal trainers, and group classes. Sauna, steam room, and nutrition counseling included in membership.",
+    workImages: [
+      "https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=800&h=600&fit=crop",
+      "https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=800&h=600&fit=crop",
+      "https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?w=800&h=600&fit=crop",
+    ],
+    priceRange: "₹1500 – ₹4000/mo",
+    isAvailable24x7: false,
+    yearsExperience: 7,
+    servicesOffered: "Weight Training, Cardio, Zumba, Yoga, CrossFit, Personal Training, Nutrition Counseling",
+    certifications: "ACE Certified Trainers, ISO 9001:2015",
+    openingHours: "Mon–Sat: 5am–11pm, Sun: 6am–10pm",
+    website: "fitzonepune.com",
+    instagram: "fitzone_pune",
+    whatsapp: "+916543210987",
+    rating: 4.4,
+    totalReviews: 51,
+    totalJobs: 380,
+    viewCount: 1890,
+    callClicks: 132,
+    whatsappClicks: 98,
+  },
+  {
+    name: "Krishna Plumbing Works",
+    slug: "krishna-plumbing-works-plumber-hyderabad",
+    phone: "+915432109876",
+    service: "Plumber",
+    city: "Hyderabad",
+    address: "H No 8-2-120, Banjara Hills Road No 2, Hyderabad, Telangana 500034",
+    lat: 17.4126,
+    lng: 78.4483,
+    profileImage: "https://images.unsplash.com/photo-1607472586893-edb57bdc0e39?w=400&h=400&fit=crop",
+    shopImage: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1200&h=675&fit=crop",
+    description: "Reliable and affordable plumbing services in Hyderabad. Available same day. We handle everything from leaking pipes to full bathroom fittings.",
+    workImages: [
+      "https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=800&h=600&fit=crop",
+      "https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=800&h=600&fit=crop",
+    ],
+    priceRange: "₹300 – ₹3000",
+    isAvailable24x7: true,
+    yearsExperience: 8,
+    servicesOffered: "Pipe Leak Repair, Bathroom Fitting, Tank Cleaning, Drain Unclogging, Water Pump Repair",
+    certifications: null,
+    openingHours: "Mon–Sun: 7am–9pm (Emergency 24/7)",
+    website: null,
+    instagram: null,
+    whatsapp: "+915432109876",
+    rating: 4.2,
+    totalReviews: 29,
+    totalJobs: 640,
+    viewCount: 980,
+    callClicks: 184,
+    whatsappClicks: 121,
+  },
+];
+
+async function seed() {
+  console.log("Seeding dummy profiles...");
+
+  for (const profile of dummyProfiles) {
+    try {
+      await pool.query(
+        `INSERT INTO profiles (
+          name, slug, phone, service, city, address, lat, lng,
+          profile_image, shop_image, description, work_images,
+          price_range, is_available_24x7, years_experience,
+          services_offered, certifications, opening_hours,
+          website, instagram, whatsapp, rating, total_reviews,
+          total_jobs, view_count, call_clicks, whatsapp_clicks
+        ) VALUES (
+          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27
+        ) ON CONFLICT (slug) DO UPDATE SET
+          rating = EXCLUDED.rating,
+          total_reviews = EXCLUDED.total_reviews,
+          total_jobs = EXCLUDED.total_jobs,
+          profile_image = EXCLUDED.profile_image,
+          shop_image = EXCLUDED.shop_image,
+          work_images = EXCLUDED.work_images,
+          description = EXCLUDED.description,
+          services_offered = EXCLUDED.services_offered,
+          certifications = EXCLUDED.certifications`,
+        [
+          profile.name, profile.slug, profile.phone, profile.service,
+          profile.city, profile.address, profile.lat, profile.lng,
+          profile.profileImage, profile.shopImage, profile.description,
+          profile.workImages, profile.priceRange, profile.isAvailable24x7,
+          profile.yearsExperience, profile.servicesOffered, profile.certifications,
+          profile.openingHours, profile.website, profile.instagram, profile.whatsapp,
+          profile.rating, profile.totalReviews, profile.totalJobs,
+          profile.viewCount, profile.callClicks, profile.whatsappClicks,
+        ]
+      );
+      console.log(`✓ ${profile.name} (${profile.city})`);
+    } catch (err) {
+      console.error(`✗ ${profile.name}:`, err.message);
+    }
+  }
+
+  await pool.end();
+  console.log("Done!");
+}
+
+seed();

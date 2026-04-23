@@ -1,22 +1,31 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: API specification
+  version: 0.2.0
+  description: Sevu API - Customer management, WhatsApp reminder system, and public profiles
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: businesses
+    description: Business profile operations
+  - name: customers
+    description: Customer management operations
+  - name: reminders
+    description: Reminder and review tracking operations
+  - name: profiles
+    description: Public business profile operations
+  - name: services
+    description: Service log operations
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +33,451 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /businesses/{id}:
+    get:
+      operationId: getBusiness
+      tags: [businesses]
+      summary: Get business profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Business profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Business"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updateBusiness
+      tags: [businesses]
+      summary: Update business profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBusinessBody"
+      responses:
+        "200":
+          description: Updated business
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Business"
+
+  /businesses:
+    post:
+      operationId: createBusiness
+      tags: [businesses]
+      summary: Create business profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBusinessBody"
+      responses:
+        "201":
+          description: Created business
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Business"
+
+  /customers:
+    get:
+      operationId: listCustomers
+      tags: [customers]
+      summary: List all customers for a business
+      parameters:
+        - name: businessId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of customers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Customer"
+    post:
+      operationId: createCustomer
+      tags: [customers]
+      summary: Add a new customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCustomerBody"
+      responses:
+        "201":
+          description: Created customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+
+  /customers/{id}:
+    get:
+      operationId: getCustomer
+      tags: [customers]
+      summary: Get a customer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updateCustomer
+      tags: [customers]
+      summary: Update a customer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCustomerBody"
+      responses:
+        "200":
+          description: Updated customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+    delete:
+      operationId: deleteCustomer
+      tags: [customers]
+      summary: Delete a customer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /customers/{id}/mark-done:
+    post:
+      operationId: markServiceDone
+      tags: [customers]
+      summary: Mark service as done and update service dates
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated customer after marking done
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [reminders]
+      summary: Get dashboard stats and today's reminders
+      parameters:
+        - name: businessId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardData"
+
+  /reminders/log:
+    post:
+      operationId: logReminderSent
+      tags: [reminders]
+      summary: Log that a reminder was sent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogReminderBody"
+      responses:
+        "201":
+          description: Logged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReminderLog"
+
+  /reviews/log:
+    post:
+      operationId: logReviewSent
+      tags: [reminders]
+      summary: Log that a review request was sent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogReviewBody"
+      responses:
+        "201":
+          description: Logged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewLog"
+
+  /service-logs:
+    get:
+      operationId: listServiceLogs
+      tags: [services]
+      summary: List service logs for a business
+      parameters:
+        - name: businessId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of service logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServiceLog"
+    post:
+      operationId: createServiceLog
+      tags: [services]
+      summary: Create a service log entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateServiceLogBody"
+      responses:
+        "201":
+          description: Created service log
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceLog"
+
+  /service-logs/{id}:
+    put:
+      operationId: updateServiceLog
+      tags: [services]
+      summary: Update a service log entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateServiceLogBody"
+      responses:
+        "200":
+          description: Updated service log
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceLog"
+    delete:
+      operationId: deleteServiceLog
+      tags: [services]
+      summary: Delete a service log entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /profiles:
+    get:
+      operationId: listProfiles
+      tags: [profiles]
+      summary: List public profiles with optional filters
+      parameters:
+        - name: service
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: city
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of profiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PublicProfile"
+    post:
+      operationId: createProfile
+      tags: [profiles]
+      summary: Create a public profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProfileBody"
+      responses:
+        "201":
+          description: Created profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicProfile"
+
+  /profiles/{slug}:
+    get:
+      operationId: getProfile
+      tags: [profiles]
+      summary: Get a public profile by slug
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Public profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicProfileWithReviews"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updateProfile
+      tags: [profiles]
+      summary: Update a public profile
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileBody"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicProfile"
+
+  /profiles/{slug}/reviews:
+    post:
+      operationId: addProfileReview
+      tags: [profiles]
+      summary: Add a review to a profile
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddProfileReviewBody"
+      responses:
+        "201":
+          description: Review added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileReview"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +485,541 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    Business:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        category:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+        reviewLink:
+          type: string
+        defaultReminderMessage:
+          type: string
+        defaultReviewMessage:
+          type: string
+        createdAt:
+          type: string
+      required: [id, name, category]
+
+    CreateBusinessBody:
+      type: object
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+      required: [name, category]
+
+    UpdateBusinessBody:
+      type: object
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+        reviewLink:
+          type: string
+        defaultReminderMessage:
+          type: string
+        defaultReviewMessage:
+          type: string
+
+    Customer:
+      type: object
+      properties:
+        id:
+          type: integer
+        businessId:
+          type: integer
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        address:
+          type: string
+        birthday:
+          type: string
+        gender:
+          type: string
+        serviceType:
+          type: string
+        lastServiceDate:
+          type: string
+        nextServiceDate:
+          type: string
+        outstandingBalance:
+          type: number
+        totalSpent:
+          type: number
+        notes:
+          type: string
+        tags:
+          type: string
+        remindersSent:
+          type: integer
+        reviewsSent:
+          type: integer
+        createdAt:
+          type: string
+      required: [id, businessId, name, phone, serviceType]
+
+    CreateCustomerBody:
+      type: object
+      properties:
+        businessId:
+          type: integer
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        address:
+          type: string
+        birthday:
+          type: string
+        gender:
+          type: string
+        serviceType:
+          type: string
+        lastServiceDate:
+          type: string
+        nextServiceDate:
+          type: string
+        outstandingBalance:
+          type: number
+        totalSpent:
+          type: number
+        notes:
+          type: string
+        tags:
+          type: string
+      required: [businessId, name, phone]
+
+    UpdateCustomerBody:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        address:
+          type: string
+        birthday:
+          type: string
+        gender:
+          type: string
+        serviceType:
+          type: string
+        lastServiceDate:
+          type: string
+        nextServiceDate:
+          type: string
+        outstandingBalance:
+          type: number
+        totalSpent:
+          type: number
+        notes:
+          type: string
+        tags:
+          type: string
+
+    DashboardData:
+      type: object
+      properties:
+        totalCustomers:
+          type: integer
+        todayReminders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Customer"
+        pendingFollowups:
+          type: integer
+        remindersSent:
+          type: integer
+        reviewsSent:
+          type: integer
+      required: [totalCustomers, todayReminders, pendingFollowups, remindersSent, reviewsSent]
+
+    LogReminderBody:
+      type: object
+      properties:
+        customerId:
+          type: integer
+        businessId:
+          type: integer
+      required: [customerId, businessId]
+
+    LogReviewBody:
+      type: object
+      properties:
+        customerId:
+          type: integer
+        businessId:
+          type: integer
+      required: [customerId, businessId]
+
+    ReminderLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        customerId:
+          type: integer
+        businessId:
+          type: integer
+        sentAt:
+          type: string
+      required: [id, customerId, businessId, sentAt]
+
+    ReviewLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        customerId:
+          type: integer
+        businessId:
+          type: integer
+        sentAt:
+          type: string
+      required: [id, customerId, businessId, sentAt]
+
+    PublicProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        businessId:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        phone:
+          type: string
+        service:
+          type: string
+        city:
+          type: string
+        address:
+          type: string
+        lat:
+          type: number
+        lng:
+          type: number
+        profileImage:
+          type: string
+        description:
+          type: string
+        workImages:
+          type: array
+          items:
+            type: string
+        priceRange:
+          type: string
+        isAvailable24x7:
+          type: boolean
+        yearsExperience:
+          type: integer
+        servicesOffered:
+          type: string
+        certifications:
+          type: string
+        openingHours:
+          type: string
+        website:
+          type: string
+        instagram:
+          type: string
+        whatsapp:
+          type: string
+        rating:
+          type: number
+        totalReviews:
+          type: integer
+        totalJobs:
+          type: integer
+        createdAt:
+          type: string
+      required: [id, name, slug, phone, service, city, rating, totalReviews, totalJobs]
+
+    PublicProfileWithReviews:
+      type: object
+      properties:
+        id:
+          type: integer
+        businessId:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        phone:
+          type: string
+        service:
+          type: string
+        city:
+          type: string
+        address:
+          type: string
+        lat:
+          type: number
+        lng:
+          type: number
+        profileImage:
+          type: string
+        description:
+          type: string
+        workImages:
+          type: array
+          items:
+            type: string
+        priceRange:
+          type: string
+        isAvailable24x7:
+          type: boolean
+        yearsExperience:
+          type: integer
+        servicesOffered:
+          type: string
+        certifications:
+          type: string
+        openingHours:
+          type: string
+        website:
+          type: string
+        instagram:
+          type: string
+        whatsapp:
+          type: string
+        rating:
+          type: number
+        totalReviews:
+          type: integer
+        totalJobs:
+          type: integer
+        createdAt:
+          type: string
+        reviews:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProfileReview"
+      required: [id, name, slug, phone, service, city, rating, totalReviews, totalJobs, reviews]
+
+    CreateProfileBody:
+      type: object
+      properties:
+        businessId:
+          type: integer
+        name:
+          type: string
+        phone:
+          type: string
+        service:
+          type: string
+        city:
+          type: string
+        address:
+          type: string
+        lat:
+          type: number
+        lng:
+          type: number
+        profileImage:
+          type: string
+        description:
+          type: string
+        workImages:
+          type: array
+          items:
+            type: string
+        priceRange:
+          type: string
+        isAvailable24x7:
+          type: boolean
+        yearsExperience:
+          type: integer
+        servicesOffered:
+          type: string
+        certifications:
+          type: string
+        openingHours:
+          type: string
+        website:
+          type: string
+        instagram:
+          type: string
+        whatsapp:
+          type: string
+      required: [name, phone, service, city]
+
+    UpdateProfileBody:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        service:
+          type: string
+        city:
+          type: string
+        address:
+          type: string
+        lat:
+          type: number
+        lng:
+          type: number
+        profileImage:
+          type: string
+        description:
+          type: string
+        workImages:
+          type: array
+          items:
+            type: string
+        priceRange:
+          type: string
+        isAvailable24x7:
+          type: boolean
+        yearsExperience:
+          type: integer
+        servicesOffered:
+          type: string
+        certifications:
+          type: string
+        openingHours:
+          type: string
+        website:
+          type: string
+        instagram:
+          type: string
+        whatsapp:
+          type: string
+
+    ProfileReview:
+      type: object
+      properties:
+        id:
+          type: integer
+        profileId:
+          type: integer
+        reviewerName:
+          type: string
+        rating:
+          type: integer
+        comment:
+          type: string
+        createdAt:
+          type: string
+      required: [id, profileId, reviewerName, rating]
+
+    ServiceLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        businessId:
+          type: integer
+        customerId:
+          type: integer
+        customerName:
+          type: string
+        service:
+          type: string
+        amount:
+          type: number
+        paymentStatus:
+          type: string
+        serviceDate:
+          type: string
+        nextVisit:
+          type: string
+        note:
+          type: string
+        createdAt:
+          type: string
+      required: [id, businessId, customerName, service, paymentStatus, serviceDate, createdAt]
+
+    CreateServiceLogBody:
+      type: object
+      properties:
+        businessId:
+          type: integer
+        customerId:
+          type: integer
+        customerName:
+          type: string
+        service:
+          type: string
+        amount:
+          type: number
+        paidAmount:
+          type: number
+        paymentStatus:
+          type: string
+        serviceDate:
+          type: string
+        paymentDate:
+          type: string
+        nextVisit:
+          type: string
+        note:
+          type: string
+      required: [businessId, customerName, service, paymentStatus, serviceDate]
+
+    UpdateServiceLogBody:
+      type: object
+      properties:
+        service:
+          type: string
+        amount:
+          type: number
+        paymentStatus:
+          type: string
+        serviceDate:
+          type: string
+        nextVisit:
+          type: string
+        note:
+          type: string
+
+    AddProfileReviewBody:
+      type: object
+      properties:
+        reviewerName:
+          type: string
+        rating:
+          type: integer
+        comment:
+          type: string
+      required: [reviewerName, rating]

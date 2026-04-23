@@ -1,0 +1,495 @@
+import { useState, useEffect } from "react";
+import { useLocation, useParams, Redirect } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import {
+  useGetCustomer,
+  useUpdateCustomer,
+  useDeleteCustomer,
+} from "@workspace/api-client-react";
+import { useBusinessId } from "@/lib/store";
+import {
+  ArrowLeft, Loader2, Save, Trash2, AlertCircle,
+  Phone, Wrench, IndianRupee, StickyNote, Bell, Plus,
+  MessageCircle,
+} from "lucide-react";
+import { getWhatsAppLink } from "@/lib/whatsapp";
+import { format, isBefore, differenceInDays } from "date-fns";
+
+interface ServiceLog {
+  id: number;
+  customerName: string;
+  service: string;
+  amount?: number;
+  paidAmount?: number;
+  paymentStatus: string;
+  serviceDate: string;
+  nextVisit?: string;
+  note?: string;
+}
+
+const COMMON_TAGS = ["VIP", "Regular", "New", "Walk-in", "Online"];
+const inp = "w-full px-4 py-3.5 bg-background border-2 border-border rounded-xl focus:border-primary outline-none transition-all font-medium text-base";
+
+export default function CustomerDetail() {
+  const { id } = useParams<{ id: string }>();
+  const customerId = parseInt(id, 10);
+  const { businessId } = useBusinessId();
+  const [, setLocation] = useLocation();
+
+  if (!customerId || customerId < 0 || isNaN(customerId)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary/40" />
+      </div>
+    );
+  }
+
+  const { data: customer, isLoading } = useGetCustomer(customerId);
+  const updateCustomer = useUpdateCustomer();
+  const deleteCustomer = useDeleteCustomer();
+
+  const { data: serviceLogs = [] } = useQuery<ServiceLog[]>({
+    queryKey: ["service-logs-customer", customerId, businessId],
+    enabled: !!businessId && !!customerId && !isNaN(customerId) && customerId > 0,
+    queryFn: async () => {
+      const res = await fetch(`/api/service-logs?businessId=${businessId}&customerId=${customerId}`);
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const [formData, setFormData] = useState({
+    name: "", phone: "", email: "", address: "", birthday: "",
+    serviceType: "", lastServiceDate: "", nextServiceDate: "",
+    outstandingBalance: "", totalSpent: "", notes: "", tags: [] as string[],
+  });
+
+  useEffect(() => {
+    if (customer) {
+      setFormData({
+        name: customer.name,
+        phone: customer.phone,
+        email: customer.email || "",
+        address: customer.address || "",
+        birthday: customer.birthday ? customer.birthday.split("T")[0] : "",
+        serviceType: customer.serviceType || "",
+        lastServiceDate: customer.lastServiceDate ? customer.lastServiceDate.split("T")[0] : "",
+        nextServiceDate: customer.nextServiceDate ? customer.nextServiceDate.split("T")[0] : "",
+        outstandingBalance: customer.outstandingBalance ? customer.outstandingBalance.toString() : "",
+        totalSpent: customer.totalSpent ? customer.totalSpent.toString() : "",
+        notes: customer.notes || "",
+        tags: customer.tags ? customer.tags.split(",").map(t => t.trim()).filter(Boolean) : [],
+      });
+    }
+  }, [customer]);
+
+  if (!businessId) return <Redirect to="/app/login" />;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-10 h-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+  if (!customer) {
+    return (
+      <div className="p-8 text-center">
+        <p>Customer not found</p>
+        <button onClick={() => setLocation("/app/customers")} className="mt-4 text-primary font-bold">
+          Go back
+        </button>
+      </div>
+    );
+  }
+
+  const set = (key: string, value: string) => setFormData(f => ({ ...f, [key]: value }));
+  const toggleTag = (tag: string) =>
+    setFormData(f => ({
+      ...f,
+      tags: f.tags.includes(tag) ? f.tags.filter(t => t !== tag) : [...f.tags, tag],
+    }));
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await updateCustomer.mutateAsync({
+        id: customerId,
+        data: {
+          name: formData.name,
+          phone: formData.phone,
+          email: formData.email || undefined,
+          address: formData.address || undefined,
+          birthday: formData.birthday || undefined,
+          serviceType: formData.serviceType || undefined,
+          lastServiceDate: formData.lastServiceDate || undefined,
+          nextServiceDate: formData.nextServiceDate || undefined,
+          outstandingBalance: formData.outstandingBalance ? parseFloat(formData.outstandingBalance) : undefined,
+          totalSpent: formData.totalSpent ? parseFloat(formData.totalSpent) : undefined,
+          notes: formData.notes || undefined,
+          tags: formData.tags.length > 0 ? formData.tags.join(", ") : undefined,
+        },
+      });
+      setIsEditing(false);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteCustomer.mutateAsync({ id: customerId });
+      setLocation("/app/customers");
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Derived values
+  const tagList = customer.tags ? customer.tags.split(",").map(t => t.trim()).filter(Boolean) : [];
+  const totalEarned = customer.totalSpent || 0;
+  const balanceDue = customer.outstandingBalance || 0;
+
+  // Reminder: prefer customer.nextServiceDate, fall back to upcoming nextVisit from any service log
+  const logNextVisit = serviceLogs
+    .filter(l => l.nextVisit)
+    .map(l => l.nextVisit!)
+    .sort()
+    .find(d => !isBefore(new Date(d), new Date()));
+  const reminderDate = customer.nextServiceDate || logNextVisit || null;
+  const isOverdue = reminderDate && isBefore(new Date(reminderDate), new Date());
+  const daysUntil = reminderDate ? differenceInDays(new Date(reminderDate), new Date()) : null;
+
+  const avatarColors = [
+    "from-violet-500 to-purple-600",
+    "from-blue-500 to-cyan-500",
+    "from-emerald-500 to-teal-600",
+    "from-rose-500 to-pink-600",
+    "from-amber-500 to-orange-500",
+  ];
+  const avatarColor = avatarColors[customer.name.charCodeAt(0) % avatarColors.length];
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col max-w-md mx-auto">
+
+      {/* ── Header ─────────────────────────────────────────────── */}
+      <div className="sticky top-0 bg-background/95 backdrop-blur-xl z-20 px-4 py-3.5 border-b border-border/50 flex items-center justify-between">
+        <button onClick={() => setLocation("/app/customers")}
+          className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-muted transition-colors active:scale-90">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <h1 className="text-base font-bold truncate flex-1 mx-3">
+          {isEditing ? "Edit Customer" : customer.name}
+        </h1>
+        {!isEditing ? (
+          <button onClick={() => setIsEditing(true)}
+            className="text-primary font-bold text-sm bg-primary/10 px-4 py-2 rounded-xl active:scale-95 transition-all">
+            Edit
+          </button>
+        ) : null}
+      </div>
+
+      <div className="flex-1 overflow-y-auto pb-10">
+
+        {/* ── EDIT MODE ──────────────────────────────────────────── */}
+        {isEditing ? (
+          <form onSubmit={handleUpdate} className="p-4 space-y-4">
+
+            <div className="bg-card p-5 rounded-3xl border border-border/50 shadow-sm space-y-4">
+              <h3 className="font-bold text-base">Basic Info</h3>
+              {[
+                { label: "Full Name *", key: "name", type: "text", required: true },
+                { label: "Phone Number *", key: "phone", type: "tel", required: true },
+                { label: "Email", key: "email", type: "email", required: false },
+                { label: "Address", key: "address", type: "text", required: false },
+              ].map(f => (
+                <div key={f.key} className="space-y-1.5">
+                  <label className="text-sm font-semibold ml-1">{f.label}</label>
+                  <input type={f.type} required={f.required} className={inp}
+                    value={(formData as any)[f.key]}
+                    onChange={e => set(f.key, e.target.value)} />
+                </div>
+              ))}
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold ml-1">Birthday</label>
+                <input type="date" className={inp} value={formData.birthday} onChange={e => set("birthday", e.target.value)} />
+              </div>
+            </div>
+
+            <div className="bg-card p-5 rounded-3xl border border-border/50 shadow-sm space-y-4">
+              <h3 className="font-bold text-base flex items-center gap-2">
+                <Wrench className="w-4 h-4 text-secondary" /> Service
+              </h3>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold ml-1">Service Type</label>
+                <input type="text" className={inp} placeholder="e.g. AC Repair, Haircut"
+                  value={formData.serviceType} onChange={e => set("serviceType", e.target.value)} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: "Last Visit", key: "lastServiceDate" },
+                  { label: "Next Reminder", key: "nextServiceDate" },
+                ].map(f => (
+                  <div key={f.key} className="space-y-1.5">
+                    <label className="text-sm font-semibold ml-1">{f.label}</label>
+                    <input type="date" className={inp} value={(formData as any)[f.key]} onChange={e => set(f.key, e.target.value)} />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-card p-5 rounded-3xl border border-border/50 shadow-sm space-y-4">
+              <h3 className="font-bold text-base flex items-center gap-2">
+                <IndianRupee className="w-4 h-4 text-amber-500" /> Money
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: "Total Earned (₹)", key: "totalSpent" },
+                  { label: "Balance Due (₹)", key: "outstandingBalance" },
+                ].map(f => (
+                  <div key={f.key} className="space-y-1.5">
+                    <label className="text-sm font-semibold ml-1">{f.label}</label>
+                    <input type="number" min={0} className={inp} placeholder="0"
+                      value={(formData as any)[f.key]} onChange={e => set(f.key, e.target.value)} />
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold ml-1">Notes</label>
+                <textarea rows={3} placeholder="Preferences, allergies, special notes..."
+                  className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl focus:border-primary outline-none resize-none text-sm font-medium"
+                  value={formData.notes} onChange={e => set("notes", e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold ml-1">Tags</label>
+                <div className="flex flex-wrap gap-2">
+                  {COMMON_TAGS.map(tag => (
+                    <button key={tag} type="button" onClick={() => toggleTag(tag)}
+                      className={`px-3 py-1.5 rounded-full text-sm font-semibold border transition-all active:scale-95 ${formData.tags.includes(tag) ? "bg-primary text-white border-primary" : "bg-background text-muted-foreground border-border"}`}>
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setIsEditing(false)}
+                className="flex-1 py-4 bg-muted text-foreground rounded-2xl font-bold">
+                Cancel
+              </button>
+              <button type="submit" disabled={updateCustomer.isPending}
+                className="flex-1 py-4 bg-primary text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/20">
+                {updateCustomer.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-5 h-5" /> Save</>}
+              </button>
+            </div>
+
+            <div>
+              {!showDeleteConfirm ? (
+                <button type="button" onClick={() => setShowDeleteConfirm(true)}
+                  className="w-full py-4 text-destructive bg-destructive/10 rounded-2xl font-bold flex items-center justify-center gap-2 border border-destructive/20">
+                  <Trash2 className="w-5 h-5" /> Delete Customer
+                </button>
+              ) : (
+                <div className="bg-destructive/10 p-5 rounded-2xl border border-destructive/30 space-y-4">
+                  <p className="text-destructive font-bold text-center flex items-center justify-center gap-2">
+                    <AlertCircle className="w-5 h-5" /> Pakka delete karna hai?
+                  </p>
+                  <div className="flex gap-3">
+                    <button type="button" onClick={() => setShowDeleteConfirm(false)}
+                      className="flex-1 py-3 bg-background rounded-xl font-bold">Cancel</button>
+                    <button type="button" onClick={handleDelete} disabled={deleteCustomer.isPending}
+                      className="flex-1 py-3 bg-destructive text-white rounded-xl font-bold flex justify-center">
+                      {deleteCustomer.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Haan, Delete"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </form>
+
+        ) : (
+          /* ── VIEW MODE ────────────────────────────────────────── */
+          <div className="p-4 space-y-3 pb-10">
+
+            {/* ①  CUSTOMER INFO ─────────────────────────────────── */}
+            <div className="bg-card rounded-3xl border border-border/50 shadow-sm px-5 pt-5 pb-4">
+              <div className="flex items-center gap-4">
+                <div className={`w-16 h-16 bg-gradient-to-br ${avatarColor} rounded-2xl flex items-center justify-center text-white text-2xl font-display font-bold shadow-md flex-shrink-0`}>
+                  {customer.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-xl font-display font-bold leading-tight truncate">{customer.name}</h2>
+                  <p className="text-sm text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 flex-shrink-0" /> {customer.phone}
+                  </p>
+                  {tagList.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {tagList.map(tag => (
+                        <span key={tag} className="px-2 py-0.5 bg-primary/10 text-primary text-[11px] font-bold rounded-full">{tag}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <button
+                onClick={() => window.open(getWhatsAppLink(customer.phone, `Hi ${customer.name}, `), "_blank")}
+                className="mt-4 w-full bg-[#25D366] text-white py-3.5 rounded-2xl font-bold flex items-center justify-center gap-2.5 active:scale-95 transition-all shadow-md shadow-[#25D366]/25 text-[15px]">
+                <MessageCircle className="w-5 h-5" /> WhatsApp pe Message Karo
+              </button>
+            </div>
+
+            {/* ②  ACTIONS ───────────────────────────────────────── */}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setLocation("/app/services")}
+                className="bg-gradient-to-br from-secondary to-secondary/80 text-white rounded-2xl p-4 flex flex-col items-center gap-2 shadow-lg shadow-secondary/20 active:scale-95 transition-all">
+                <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center">
+                  <Plus className="w-6 h-6" />
+                </div>
+                <span className="text-sm font-bold leading-tight text-center">Kaam Add Karo</span>
+              </button>
+              <button
+                onClick={() => setLocation("/app/services")}
+                className="bg-gradient-to-br from-primary to-primary/80 text-white rounded-2xl p-4 flex flex-col items-center gap-2 shadow-lg shadow-primary/20 active:scale-95 transition-all">
+                <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center">
+                  <Bell className="w-6 h-6" />
+                </div>
+                <span className="text-sm font-bold leading-tight text-center">Reminder Set Karo</span>
+              </button>
+            </div>
+
+            {/* ③  NEXT REMINDER ─────────────────────────────────── */}
+            {reminderDate ? (
+              <div className={`rounded-2xl px-4 py-4 flex items-center gap-3.5 border ${
+                isOverdue
+                  ? "bg-red-50 dark:bg-red-900/15 border-red-200/60"
+                  : "bg-primary/5 border-primary/20"
+              }`}>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                  isOverdue ? "bg-red-100 dark:bg-red-900/30" : "bg-primary/15"
+                }`}>
+                  <Bell className={`w-5 h-5 ${isOverdue ? "text-red-500" : "text-primary"}`} />
+                </div>
+                <div className="flex-1">
+                  <p className={`text-xs font-black uppercase tracking-wider ${isOverdue ? "text-red-500" : "text-primary"}`}>
+                    {isOverdue ? "⚠️ Follow-up Miss Ho Gaya!" : "🔔 Next Reminder"}
+                  </p>
+                  <p className="font-bold text-foreground text-base mt-0.5">
+                    {format(new Date(reminderDate), "d MMMM yyyy")}
+                  </p>
+                  <p className={`text-xs mt-0.5 ${isOverdue ? "text-red-400" : "text-muted-foreground"}`}>
+                    {isOverdue && daysUntil !== null
+                      ? `${Math.abs(daysUntil)} din pehle tha`
+                      : daysUntil === 0 ? "Aaj hai!"
+                      : `${daysUntil} din baad`}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl px-4 py-4 flex items-center gap-3.5 border border-dashed border-border bg-muted/40">
+                <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+                  <Bell className="w-5 h-5 text-muted-foreground" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-muted-foreground">Koi reminder nahi set hai</p>
+                  <p className="text-xs text-muted-foreground/70 mt-0.5">Upar "Reminder Set Karo" dabao</p>
+                </div>
+              </div>
+            )}
+
+            {/* ④  RECENT ACTIVITY ───────────────────────────────── */}
+            <div>
+              <div className="flex items-center justify-between mb-2 px-1">
+                <p className="text-sm font-bold text-foreground">Recent Kaam</p>
+                {serviceLogs.length > 3 && (
+                  <span className="text-xs text-muted-foreground">{serviceLogs.length} total</span>
+                )}
+              </div>
+
+              {serviceLogs.length === 0 ? (
+                <div className="bg-card rounded-2xl border border-border/50 p-5 text-center">
+                  <p className="text-sm text-muted-foreground">Abhi koi kaam record nahi</p>
+                  <button onClick={() => setLocation("/app/services")}
+                    className="mt-2 text-primary font-bold text-sm flex items-center gap-1 mx-auto">
+                    <Plus className="w-4 h-4" /> Pehla kaam add karo
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {serviceLogs.slice().reverse().slice(0, 3).map(log => (
+                    <div key={log.id} className="bg-card rounded-2xl border border-border/50 px-4 py-3 flex items-center gap-3">
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-0.5 ${
+                        log.paymentStatus === "paid" ? "bg-green-500" : "bg-orange-400"
+                      }`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm leading-tight">{log.service}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {log.nextVisit && log.paymentStatus === "pending"
+                            ? format(new Date(log.nextVisit), "d MMM yyyy")
+                            : log.serviceDate
+                              ? format(new Date(log.serviceDate), "d MMM yyyy")
+                              : "—"}
+                        </p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        {log.amount ? (
+                          <p className={`font-bold text-sm ${log.paymentStatus === "paid" ? "text-green-600 dark:text-green-400" : "text-orange-500"}`}>
+                            ₹{log.amount.toLocaleString()}
+                          </p>
+                        ) : null}
+                        <p className={`text-[11px] font-semibold ${log.paymentStatus === "paid" ? "text-green-500" : "text-orange-400"}`}>
+                          {log.paymentStatus === "paid" ? "Paid ✓" : "Pending"}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  {serviceLogs.length > 3 && (
+                    <p className="text-center text-xs text-muted-foreground pt-1">
+                      + {serviceLogs.length - 3} aur kaam
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ⑤  MONEY SUMMARY (bottom, secondary) ─────────────── */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-green-50 dark:bg-green-900/15 rounded-2xl p-4 border border-green-100 dark:border-green-800/30 text-center">
+                <p className="text-[11px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wide">Total Kamaya</p>
+                <p className="text-2xl font-display font-bold text-green-600 dark:text-green-400 mt-1">
+                  ₹{totalEarned.toLocaleString()}
+                </p>
+              </div>
+              <div className={`rounded-2xl p-4 border text-center ${
+                balanceDue > 0
+                  ? "bg-orange-50 dark:bg-orange-900/15 border-orange-100 dark:border-orange-800/30"
+                  : "bg-card border-border/50"
+              }`}>
+                <p className={`text-[11px] font-bold uppercase tracking-wide ${balanceDue > 0 ? "text-orange-500" : "text-muted-foreground"}`}>
+                  Baaki Baki Hai
+                </p>
+                <p className={`text-2xl font-display font-bold mt-1 ${balanceDue > 0 ? "text-orange-500" : "text-muted-foreground"}`}>
+                  ₹{balanceDue.toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            {/* ⑥  NOTES (if any) ───────────────────────────────── */}
+            {customer.notes && (
+              <div className="bg-amber-50 dark:bg-amber-900/10 rounded-2xl p-4 border border-amber-200/50 flex gap-3">
+                <StickyNote className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-foreground/90 leading-relaxed">{customer.notes}</p>
+              </div>
+            )}
+
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
