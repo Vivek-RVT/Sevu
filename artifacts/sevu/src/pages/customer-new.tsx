@@ -122,42 +122,45 @@ export default function CustomerNew() {
     });
 
     haptic("success");
+
+    const payload = {
+      businessId,
+      name: name.trim(),
+      phone: fullPhone.trim(),
+      email: email.trim() || undefined,
+      gender: gender || undefined,
+      address: address.trim() || undefined,
+      birthday: birthday || undefined,
+      serviceType: serviceType.trim() || undefined,
+      nextServiceDate: nextServiceDate || undefined,
+      notes: notes.trim() || undefined,
+    };
+
+    // Navigate first — instant, no waiting on the network.
     setLocation("/app/customers");
 
-    // Save to server in background
-    createCustomer.mutate(
-      {
-        data: {
-          businessId,
-          name: name.trim(),
-          phone: fullPhone.trim(),
-          email: email.trim() || undefined,
-          gender: gender || undefined,
-          address: address.trim() || undefined,
-          birthday: birthday || undefined,
-          serviceType: serviceType.trim() || undefined,
-          nextServiceDate: nextServiceDate || undefined,
-          notes: notes.trim() || undefined,
+    // Fire the request after navigation so the form unmounts immediately
+    // and the user never sees a pending spinner.
+    queueMicrotask(() => {
+      createCustomer.mutate(
+        { data: payload },
+        {
+          onSuccess: (real) => {
+            queryClient.setQueryData<Customer[]>(cacheKey, old =>
+              (old ?? []).map(c => c.id === tempId ? (real as Customer) : c)
+            );
+            removePendingCustomer(tempId);
+            queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+          },
+          onError: () => {
+            queryClient.setQueryData<Customer[]>(cacheKey, old =>
+              (old ?? []).filter(c => c.id !== tempId)
+            );
+            removePendingCustomer(tempId);
+          },
         }
-      },
-      {
-        onSuccess: (real) => {
-          // Replace temp entry in cache with the real one (no flicker, no refetch)
-          queryClient.setQueryData<Customer[]>(cacheKey, old =>
-            (old ?? []).map(c => c.id === tempId ? (real as Customer) : c)
-          );
-          removePendingCustomer(tempId);
-          queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-        },
-        onError: () => {
-          // Roll back the optimistic entry
-          queryClient.setQueryData<Customer[]>(cacheKey, old =>
-            (old ?? []).filter(c => c.id !== tempId)
-          );
-          removePendingCustomer(tempId);
-        },
-      }
-    );
+      );
+    });
   };
 
   return (

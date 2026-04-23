@@ -69,7 +69,7 @@ export default function Customers() {
 
   const { data: serverCustomers = [], isLoading } = useListCustomers(
     { businessId, search: debouncedSearch || undefined },
-    { query: { staleTime: 30_000, refetchOnMount: false } },
+    { query: { staleTime: 0, refetchOnMount: "always", refetchOnWindowFocus: true } },
   );
 
   // Merge pending (optimistic) with server data — pending entries appear at top

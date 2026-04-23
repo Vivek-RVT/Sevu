@@ -10,7 +10,8 @@ import { useBusinessId } from "@/lib/store";
 import {
   ArrowLeft, Loader2, Save, Trash2, AlertCircle,
   Phone, Wrench, IndianRupee, StickyNote, Bell, Plus,
-  MessageCircle,
+  MessageCircle, CheckCircle2, Clock, UserPlus, Hammer,
+  CalendarDays, SplitSquareHorizontal, ChevronDown,
 } from "lucide-react";
 import { getWhatsAppLink } from "@/lib/whatsapp";
 import { format, isBefore, differenceInDays } from "date-fns";
@@ -60,6 +61,7 @@ export default function CustomerDetail() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showAllActivity, setShowAllActivity] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "", phone: "", email: "", address: "", birthday: "",
@@ -402,60 +404,171 @@ export default function CustomerDetail() {
               </div>
             )}
 
-            {/* ④  RECENT ACTIVITY ───────────────────────────────── */}
-            <div>
-              <div className="flex items-center justify-between mb-2 px-1">
-                <p className="text-sm font-bold text-foreground">Recent Kaam</p>
-                {serviceLogs.length > 3 && (
-                  <span className="text-xs text-muted-foreground">{serviceLogs.length} total</span>
-                )}
-              </div>
+            {/* ④  ACTIVITY TIMELINE ───────────────────────────────── */}
+            {(() => {
+              type Event = {
+                id: string;
+                date: Date;
+                kind: "created" | "service" | "upcoming";
+                log?: ServiceLog;
+              };
 
-              {serviceLogs.length === 0 ? (
-                <div className="bg-card rounded-2xl border border-border/50 p-5 text-center">
-                  <p className="text-sm text-muted-foreground">Abhi koi kaam record nahi</p>
-                  <button onClick={() => setLocation("/app/services")}
-                    className="mt-2 text-primary font-bold text-sm flex items-center gap-1 mx-auto">
-                    <Plus className="w-4 h-4" /> Pehla kaam add karo
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {serviceLogs.slice().reverse().slice(0, 3).map(log => (
-                    <div key={log.id} className="bg-card rounded-2xl border border-border/50 px-4 py-3 flex items-center gap-3">
-                      <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-0.5 ${
-                        log.paymentStatus === "paid" ? "bg-green-500" : "bg-orange-400"
-                      }`} />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm leading-tight">{log.service}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {log.nextVisit && log.paymentStatus === "pending"
-                            ? format(new Date(log.nextVisit), "d MMM yyyy")
-                            : log.serviceDate
-                              ? format(new Date(log.serviceDate), "d MMM yyyy")
-                              : "—"}
-                        </p>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        {log.amount ? (
-                          <p className={`font-bold text-sm ${log.paymentStatus === "paid" ? "text-green-600 dark:text-green-400" : "text-orange-500"}`}>
-                            ₹{log.amount.toLocaleString()}
-                          </p>
-                        ) : null}
-                        <p className={`text-[11px] font-semibold ${log.paymentStatus === "paid" ? "text-green-500" : "text-orange-400"}`}>
-                          {log.paymentStatus === "paid" ? "Paid ✓" : "Pending"}
-                        </p>
-                      </div>
+              const events: Event[] = [];
+
+              // Customer creation event
+              if (customer.createdAt) {
+                events.push({
+                  id: "created",
+                  date: new Date(customer.createdAt),
+                  kind: "created",
+                });
+              }
+
+              // Each service log = one event (use serviceDate, fall back to nextVisit for todos)
+              for (const log of serviceLogs) {
+                const isTodo = !!(log.nextVisit && log.paymentStatus === "pending");
+                const when = isTodo
+                  ? new Date(log.nextVisit!)
+                  : new Date(log.serviceDate);
+                events.push({
+                  id: `log-${log.id}`,
+                  date: when,
+                  kind: isTodo ? "upcoming" : "service",
+                  log,
+                });
+              }
+
+              // Newest first
+              events.sort((a, b) => b.date.getTime() - a.date.getTime());
+              const visible = showAllActivity ? events : events.slice(0, 5);
+
+              return (
+                <div>
+                  <div className="flex items-center justify-between mb-3 px-1">
+                    <p className="text-sm font-bold text-foreground">Activity Timeline</p>
+                    {events.length > 0 && (
+                      <span className="text-xs text-muted-foreground">{events.length} {events.length === 1 ? "event" : "events"}</span>
+                    )}
+                  </div>
+
+                  {events.length === 0 ? (
+                    <div className="bg-card rounded-2xl border border-border/50 p-5 text-center">
+                      <p className="text-sm text-muted-foreground">Abhi koi activity nahi</p>
+                      <button onClick={() => setLocation("/app/services")}
+                        className="mt-2 text-primary font-bold text-sm flex items-center gap-1 mx-auto">
+                        <Plus className="w-4 h-4" /> Pehla kaam add karo
+                      </button>
                     </div>
-                  ))}
-                  {serviceLogs.length > 3 && (
-                    <p className="text-center text-xs text-muted-foreground pt-1">
-                      + {serviceLogs.length - 3} aur kaam
-                    </p>
+                  ) : (
+                    <div className="bg-card rounded-2xl border border-border/50 px-4 py-4">
+                      <div className="relative">
+                        {/* Vertical line */}
+                        <div className="absolute left-[15px] top-3 bottom-3 w-px bg-border/60" />
+
+                        <div className="space-y-4">
+                          {visible.map((ev) => {
+                            const log = ev.log;
+                            const isPaid  = log?.paymentStatus === "paid";
+                            const isPart  = log?.paymentStatus === "partial";
+                            const isPend  = log?.paymentStatus === "pending";
+
+                            // Visual config per event type
+                            let dotClass = "bg-muted text-muted-foreground";
+                            let icon: React.ReactNode = <Clock className="w-3.5 h-3.5" />;
+                            let title = "";
+                            let subtitle = "";
+
+                            if (ev.kind === "created") {
+                              dotClass = "bg-primary/15 text-primary";
+                              icon = <UserPlus className="w-3.5 h-3.5" />;
+                              title = "Customer added";
+                              subtitle = "Khata shuru kiya";
+                            } else if (ev.kind === "upcoming") {
+                              dotClass = "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400";
+                              icon = <Wrench className="w-3.5 h-3.5" />;
+                              title = `Upcoming: ${log!.service}`;
+                              subtitle = "Kaam karna hai";
+                            } else if (isPaid) {
+                              dotClass = "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400";
+                              icon = <CheckCircle2 className="w-3.5 h-3.5" />;
+                              title = log!.service;
+                              subtitle = "Kaam hua · Paid";
+                            } else if (isPart) {
+                              dotClass = "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400";
+                              icon = <SplitSquareHorizontal className="w-3.5 h-3.5" />;
+                              title = log!.service;
+                              subtitle = "Kaam hua · Partial payment";
+                            } else if (isPend) {
+                              dotClass = "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400";
+                              icon = <Clock className="w-3.5 h-3.5" />;
+                              title = log!.service;
+                              subtitle = "Kaam hua · Payment pending";
+                            } else {
+                              dotClass = "bg-muted text-muted-foreground";
+                              icon = <Hammer className="w-3.5 h-3.5" />;
+                              title = log!.service;
+                              subtitle = "Kaam hua";
+                            }
+
+                            const amount = log?.amount;
+                            const paidAmt = isPaid ? amount : isPart ? log?.paidAmount : 0;
+                            const dueAmt = isPend ? amount : isPart && amount ? amount - (log?.paidAmount ?? 0) : 0;
+
+                            return (
+                              <div key={ev.id} className="relative pl-10">
+                                {/* Dot */}
+                                <div className={`absolute left-0 top-0 w-8 h-8 rounded-full flex items-center justify-center ring-4 ring-card ${dotClass}`}>
+                                  {icon}
+                                </div>
+
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-semibold text-foreground leading-tight truncate">{title}</p>
+                                    <p className="text-[11px] text-muted-foreground font-medium mt-0.5">{subtitle}</p>
+                                    {log?.note && (
+                                      <p className="text-[11px] text-muted-foreground/80 italic mt-1 line-clamp-2">"{log.note}"</p>
+                                    )}
+                                    <p className="text-[10px] text-muted-foreground/70 font-medium mt-1 flex items-center gap-1">
+                                      <CalendarDays className="w-2.5 h-2.5" />
+                                      {format(ev.date, "EEE, d MMM yyyy")}
+                                    </p>
+                                  </div>
+
+                                  {amount != null && amount > 0 && (
+                                    <div className="text-right flex-shrink-0">
+                                      {paidAmt ? (
+                                        <p className="text-xs font-bold text-green-600 dark:text-green-400 flex items-center justify-end gap-0.5">
+                                          <IndianRupee className="w-2.5 h-2.5" />{paidAmt.toLocaleString()}
+                                        </p>
+                                      ) : null}
+                                      {dueAmt > 0 && (
+                                        <p className="text-[11px] font-semibold text-orange-500 flex items-center justify-end gap-0.5">
+                                          <IndianRupee className="w-2.5 h-2.5" />{dueAmt.toLocaleString()} due
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {events.length > 5 && (
+                        <button
+                          onClick={() => setShowAllActivity(v => !v)}
+                          className="w-full mt-3 pt-3 border-t border-border/40 text-xs text-primary font-bold flex items-center justify-center gap-1 hover:bg-primary/5 rounded-xl py-2 transition-colors"
+                        >
+                          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAllActivity ? "rotate-180" : ""}`} />
+                          {showAllActivity ? "Kam dikhao" : `Saari ${events.length} dikhao`}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
+              );
+            })()}
 
             {/* ⑤  MONEY SUMMARY (bottom, secondary) ─────────────── */}
             <div className="grid grid-cols-2 gap-3">

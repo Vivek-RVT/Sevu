@@ -76,12 +76,12 @@ export default function Services() {
 
   const { data: logs = [], isLoading } = useListServiceLogs(
     { businessId: safeBusinessId },
-    { query: { staleTime: 30_000, refetchOnMount: false } },
+    { query: { staleTime: 0, refetchOnMount: "always", refetchOnWindowFocus: true } },
   );
 
   const { data: customers = [], isLoading: customersLoading } = useListCustomers(
     { businessId: safeBusinessId },
-    { query: { enabled: safeBusinessId > 0, staleTime: 30_000, refetchOnMount: false } },
+    { query: { enabled: safeBusinessId > 0, staleTime: 0, refetchOnMount: "always" } },
   );
 
   const createLog = useMutation({
@@ -667,11 +667,11 @@ export default function Services() {
         return (
           <>
             <div className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" onClick={() => setSelectedLog(null)} />
-            <div className="fixed inset-0 z-50 flex items-end justify-center pointer-events-none">
-              <div className="w-full max-w-sm pointer-events-auto bg-card rounded-t-3xl shadow-2xl border border-border/40 pb-8 animate-in slide-in-from-bottom-4 duration-300">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+              <div className="w-full max-w-sm pointer-events-auto bg-card rounded-3xl shadow-2xl border border-border/40 pb-6 overflow-hidden animate-in zoom-in-95 fade-in duration-200">
 
                 {/* Header */}
-                <div className={`rounded-t-3xl px-5 pt-5 pb-4 ${
+                <div className={`px-5 pt-5 pb-4 ${
                   isPaid ? "bg-green-500" : isPartial ? "bg-purple-500" : isLogTodo ? "bg-blue-500" : "bg-orange-500"
                 }`}>
                   <div className="flex items-center justify-between mb-3">
