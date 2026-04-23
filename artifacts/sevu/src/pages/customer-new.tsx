@@ -145,16 +145,32 @@ export default function CustomerNew() {
       createCustomer.mutate(
         { data: payload },
         {
-          onSuccess: (real) => {
-            queryClient.setQueryData<Customer[]>(cacheKey, old =>
-              (old ?? []).map(c => c.id === tempId ? (real as Customer) : c)
+          onSuccess: async (real) => {
+            // Inject real customer into EVERY listCustomers cache entry
+            // (the customers page key includes a `search` param so the
+            // exact key from customer-new doesn't match it — we patch all)
+            queryClient.setQueriesData<Customer[]>(
+              { queryKey: ["/api/customers"] },
+              old => {
+                if (!old) return old;
+                const hasTemp = old.some(c => c.id === tempId);
+                if (hasTemp) {
+                  return old.map(c => c.id === tempId ? (real as Customer) : c);
+                }
+                // No temp in this cache slot — prepend the real customer
+                // unless it's already present (by phone)
+                if (old.some(c => c.phone === (real as Customer).phone)) return old;
+                return [real as Customer, ...old];
+              },
             );
+            // Now safe to drop the pending entry: real one is in every cache
             removePendingCustomer(tempId);
             queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
           },
           onError: () => {
-            queryClient.setQueryData<Customer[]>(cacheKey, old =>
-              (old ?? []).filter(c => c.id !== tempId)
+            queryClient.setQueriesData<Customer[]>(
+              { queryKey: ["/api/customers"] },
+              old => (old ?? []).filter(c => c.id !== tempId),
             );
             removePendingCustomer(tempId);
           },
