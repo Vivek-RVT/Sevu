@@ -1270,8 +1270,10 @@ export default function Settings() {
                               </label>
                               <div className="flex flex-wrap gap-2">
                                 {cfg.services.map(svc => {
-                                  const selected = profileData.selectedServices.includes(svc) ||
-                                    (!profileData.selectedServices.length && profileData.servicesOffered.includes(svc));
+                                  const selectedList = profileData.selectedServices ?? [];
+                                  const offeredText = profileData.servicesOffered ?? "";
+                                  const selected = selectedList.includes(svc) ||
+                                    (!selectedList.length && offeredText.includes(svc));
                                   return (
                                     <button key={svc} type="button" onClick={() => toggleSvc(svc)}
                                       className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all active:scale-95
