@@ -78,12 +78,11 @@ const inp = "w-full px-3.5 py-3 bg-background border-2 border-border rounded-xl 
 type Tab = "profile" | "analytics";
 
 export default function Analytics() {
+  // ── ALL HOOKS MUST BE CALLED UNCONDITIONALLY (before any return) ──
   const { businessId } = useBusinessId();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("profile");
-
-  if (!businessId) return <Redirect to="/app/login" />;
 
   const { data: profiles, isLoading: loadingProfiles } = useQuery<any[]>({
     queryKey: ["my-profile", businessId],
@@ -91,7 +90,8 @@ export default function Analytics() {
       const res = await fetch(`/api/profiles?businessId=${businessId}`);
       if (!res.ok) throw new Error("Failed");
       return res.json();
-    }
+    },
+    enabled: !!businessId,
   });
 
   const myProfile = profiles?.[0];
@@ -107,9 +107,7 @@ export default function Analytics() {
     enabled: !!slug,
   });
 
-  const isLoading = loadingProfiles || loadingAnalytics;
-
-  // ── Edit modal state ─────────────────────────────────────────
+  // Edit modal state
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -134,6 +132,12 @@ export default function Analytics() {
       address: myProfile.address || "",
     });
   }, [myProfile]);
+
+  // Image uploads
+  const [uploadingProfile, setUploadingProfile] = useState(false);
+  const [uploadingShop, setUploadingShop] = useState(false);
+  const profileInput = useRef<HTMLInputElement>(null);
+  const shopInput = useRef<HTMLInputElement>(null);
 
   const patchProfile = async (fields: Record<string, unknown>) => {
     if (!slug) return;
@@ -161,12 +165,6 @@ export default function Analytics() {
     }
   };
 
-  // ── Image uploads ────────────────────────────────────────────
-  const [uploadingProfile, setUploadingProfile] = useState(false);
-  const [uploadingShop, setUploadingShop] = useState(false);
-  const profileInput = useRef<HTMLInputElement>(null);
-  const shopInput = useRef<HTMLInputElement>(null);
-
   const saveImageRecord = (objectPath: string, type: string) =>
     fetch("/api/storage/images", {
       method: "POST",
@@ -193,6 +191,11 @@ export default function Analytics() {
     },
     onError: () => setUploadingShop(false),
   });
+
+  // ── Conditional return AFTER all hooks ───────────────────────
+  if (!businessId) return <Redirect to="/app/login" />;
+
+  const isLoading = loadingProfiles || loadingAnalytics;
 
   const handleProfilePic = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
