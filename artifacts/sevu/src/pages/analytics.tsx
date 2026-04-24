@@ -75,6 +75,37 @@ function StarRow({ rating }: { rating: number }) {
 
 const inp = "w-full px-3.5 py-3 bg-background border-2 border-border rounded-xl focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all text-sm font-medium placeholder:text-muted-foreground/50";
 
+// ── Service suggestions per category (Hinglish-friendly common ones) ─────────
+const CATEGORY_SERVICE_CHIPS: Record<string, string[]> = {
+  "AC Repair":         ["AC service", "Gas refill", "Installation", "Cooling issue fix", "Compressor repair", "AMC"],
+  "Plumber":           ["Pipe repair", "Leak fixing", "Tap fitting", "Bathroom fitting", "Drain cleaning", "Geyser install"],
+  "Electrician":       ["Wiring", "Switch repair", "Fan install", "Lighting", "MCB / Panel", "CCTV"],
+  "Salon / Barbershop":["Haircut", "Shave", "Beard trim", "Hair color", "Facial", "Hair spa"],
+  "Carpenter":         ["Furniture repair", "Modular kitchen", "Door fitting", "Cabinets", "Polish work"],
+  "Painter":           ["Interior painting", "Exterior", "Texture", "Waterproofing", "Wood polish"],
+  "Home Cleaning":     ["Deep cleaning", "Sofa cleaning", "Kitchen", "Bathroom", "Carpet shampoo"],
+  "Car Mechanic":      ["Engine repair", "Denting & painting", "Servicing", "Battery change", "Tyre work"],
+  "Bike Repair":       ["Engine repair", "Tyre change", "Chain", "Servicing", "Battery"],
+  "Tutor":             ["Maths", "Science", "English", "Board exams", "JEE / NEET prep"],
+  "Photographer":      ["Wedding", "Portrait", "Product", "Events", "Baby shoot"],
+  "Tailor":            ["Wedding wear", "Alterations", "Suits", "Blouses", "Salwar"],
+  "RO / Water Filter": ["RO installation", "Filter change", "Repair", "AMC"],
+  "Laptop Repair":     ["Screen repair", "Keyboard", "Software", "Data recovery", "Battery"],
+};
+const GENERIC_SERVICE_CHIPS = ["New install", "Repair", "Servicing", "AMC", "Emergency call"];
+
+const PRICE_CHIPS = [
+  "Under ₹500", "₹500 – ₹1500", "₹1500 – ₹5000", "₹5000+", "Quote on request",
+];
+
+const HOURS_CHIPS = [
+  "Mon–Sat: 9am–8pm",
+  "Mon–Sun: 10am–9pm",
+  "Mon–Fri: 8am–6pm",
+  "Daily: 24 Hours",
+  "Mon–Sat: 9am–8pm (Closed Sun)",
+];
+
 type Tab = "profile" | "analytics";
 
 export default function Analytics() {
@@ -136,6 +167,7 @@ export default function Analytics() {
   // Image uploads
   const [uploadingProfile, setUploadingProfile] = useState(false);
   const [uploadingShop, setUploadingShop] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const profileInput = useRef<HTMLInputElement>(null);
   const shopInput = useRef<HTMLInputElement>(null);
 
@@ -174,22 +206,38 @@ export default function Analytics() {
 
   const profileUpload = useUpload({
     onSuccess: async (res) => {
-      const url = toPublicUrl(res.objectPath);
-      saveImageRecord(res.objectPath, "profile");
-      await patchProfile({ profileImage: url });
-      setUploadingProfile(false);
+      try {
+        const url = toPublicUrl(res.objectPath);
+        await saveImageRecord(res.objectPath, "profile");
+        await patchProfile({ profileImage: url });
+      } catch (err: any) {
+        setUploadError(err?.message || "Image saved but couldn't update profile.");
+      } finally {
+        setUploadingProfile(false);
+      }
     },
-    onError: () => setUploadingProfile(false),
+    onError: (err: any) => {
+      setUploadingProfile(false);
+      setUploadError(err?.message || "Logo upload failed. Try again.");
+    },
   });
 
   const shopUpload = useUpload({
     onSuccess: async (res) => {
-      const url = toPublicUrl(res.objectPath);
-      saveImageRecord(res.objectPath, "shop");
-      await patchProfile({ shopImage: url });
-      setUploadingShop(false);
+      try {
+        const url = toPublicUrl(res.objectPath);
+        await saveImageRecord(res.objectPath, "shop");
+        await patchProfile({ shopImage: url });
+      } catch (err: any) {
+        setUploadError(err?.message || "Image saved but couldn't update profile.");
+      } finally {
+        setUploadingShop(false);
+      }
     },
-    onError: () => setUploadingShop(false),
+    onError: (err: any) => {
+      setUploadingShop(false);
+      setUploadError(err?.message || "Banner upload failed. Try again.");
+    },
   });
 
   // ── Conditional return AFTER all hooks ───────────────────────
@@ -254,6 +302,19 @@ export default function Analytics() {
 
         {!isLoading && myProfile && analytics && (
           <>
+            {uploadError && (
+              <div className="mx-4 mt-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 flex items-start gap-2.5">
+                <X className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-destructive">Upload failed</p>
+                  <p className="text-xs text-destructive/80 mt-0.5 break-words">{uploadError}</p>
+                </div>
+                <button onClick={() => setUploadError(null)} className="text-destructive/70 hover:text-destructive">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
             {/* ── BANNER + LOGO HEADER ─────────────────────── */}
             <div className="relative">
               {/* Banner */}
@@ -274,7 +335,7 @@ export default function Analytics() {
                     ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading...</>
                     : <><Camera className="w-3.5 h-3.5" /> {myProfile.shopImage ? "Change" : "Add"} banner</>}
                 </button>
-                <input ref={shopInput} type="file" accept="image/*" hidden onChange={handleShopPic} />
+                <input ref={shopInput} type="file" accept="image/*" className="hidden" onChange={handleShopPic} />
               </div>
 
               {/* Logo + Edit */}
@@ -293,7 +354,7 @@ export default function Analytics() {
                     className="absolute -bottom-1 -right-1 w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center shadow-md active:scale-90 transition disabled:opacity-60">
                     {uploadingProfile ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
                   </button>
-                  <input ref={profileInput} type="file" accept="image/*" hidden onChange={handleProfilePic} />
+                  <input ref={profileInput} type="file" accept="image/*" className="hidden" onChange={handleProfilePic} />
                 </div>
 
                 <button onClick={() => setEditing(true)}
@@ -603,13 +664,47 @@ export default function Analytics() {
                   placeholder="Apna kaam ke baare mein batao..." />
               </div>
 
+              {/* ── Services Offered with chips ───────────────── */}
               <div>
                 <label className="text-xs font-bold text-foreground mb-1.5 block">Services Offered</label>
-                <textarea rows={2} className={inp}
-                  value={form.servicesOffered}
-                  onChange={e => setForm({ ...form, servicesOffered: e.target.value })}
-                  placeholder="Comma se separate karo: Service 1, Service 2..." />
-                <p className="text-[10px] text-muted-foreground mt-1">Comma separated</p>
+                {(() => {
+                  const cat = myProfile?.service || "";
+                  const chips = CATEGORY_SERVICE_CHIPS[cat] || GENERIC_SERVICE_CHIPS;
+                  const current = form.servicesOffered
+                    .split(",").map(s => s.trim()).filter(Boolean);
+                  const isPicked = (s: string) =>
+                    current.some(c => c.toLowerCase() === s.toLowerCase());
+                  const toggle = (s: string) => {
+                    const next = isPicked(s)
+                      ? current.filter(c => c.toLowerCase() !== s.toLowerCase())
+                      : [...current, s];
+                    setForm({ ...form, servicesOffered: next.join(", ") });
+                  };
+                  return (
+                    <>
+                      <p className="text-[11px] text-muted-foreground mb-2">
+                        {cat ? `Suggested for ${cat}` : "Common services"} — tap to add
+                      </p>
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {chips.map(s => (
+                          <button key={s} type="button" onClick={() => toggle(s)}
+                            className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all active:scale-95 ${
+                              isPicked(s)
+                                ? "bg-primary text-white border-primary shadow-sm"
+                                : "bg-background text-muted-foreground border-border hover:border-primary/40"
+                            }`}>
+                            {isPicked(s) ? "✓ " : "+ "}{s}
+                          </button>
+                        ))}
+                      </div>
+                      <textarea rows={2} className={inp}
+                        value={form.servicesOffered}
+                        onChange={e => setForm({ ...form, servicesOffered: e.target.value })}
+                        placeholder="Ya khud likho, comma se separate karo..." />
+                      <p className="text-[10px] text-muted-foreground mt-1">Chips se choose karo ya khud type karo</p>
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -621,37 +716,69 @@ export default function Analytics() {
                     placeholder="5" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-foreground mb-1.5 block">Price Range</label>
-                  <input type="text" className={inp}
-                    value={form.priceRange}
-                    onChange={e => setForm({ ...form, priceRange: e.target.value })}
-                    placeholder="₹500 – ₹2000" />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-foreground mb-1.5 block">Opening Hours</label>
-                <input type="text" className={inp}
-                  value={form.openingHours}
-                  onChange={e => setForm({ ...form, openingHours: e.target.value })}
-                  placeholder="Mon–Sat: 9am–8pm" />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
                   <label className="text-xs font-bold text-foreground mb-1.5 block">City</label>
                   <input type="text" className={inp}
                     value={form.city}
                     onChange={e => setForm({ ...form, city: e.target.value })}
                     placeholder="Mumbai" />
                 </div>
-                <div>
-                  <label className="text-xs font-bold text-foreground mb-1.5 block">WhatsApp</label>
-                  <input type="tel" className={inp}
-                    value={form.whatsapp}
-                    onChange={e => setForm({ ...form, whatsapp: e.target.value })}
-                    placeholder="+91..." />
+              </div>
+
+              {/* ── Price Range with chips ────────────────────── */}
+              <div>
+                <label className="text-xs font-bold text-foreground mb-1.5 block">Price Range</label>
+                <p className="text-[11px] text-muted-foreground mb-2">Tap to choose</p>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {PRICE_CHIPS.map(p => (
+                    <button key={p} type="button"
+                      onClick={() => setForm({ ...form, priceRange: p })}
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all active:scale-95 ${
+                        form.priceRange === p
+                          ? "bg-primary text-white border-primary shadow-sm"
+                          : "bg-background text-muted-foreground border-border hover:border-primary/40"
+                      }`}>
+                      {p}
+                    </button>
+                  ))}
                 </div>
+                <input type="text" className={inp}
+                  value={form.priceRange}
+                  onChange={e => setForm({ ...form, priceRange: e.target.value })}
+                  placeholder="Ya khud likho: ₹500 – ₹2000" />
+              </div>
+
+              {/* ── Opening Hours with chips ──────────────────── */}
+              <div>
+                <label className="text-xs font-bold text-foreground mb-1.5 block">Opening Hours</label>
+                <p className="text-[11px] text-muted-foreground mb-2">Tap to choose</p>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {HOURS_CHIPS.map(h => (
+                    <button key={h} type="button"
+                      onClick={() => setForm({ ...form, openingHours: h })}
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all active:scale-95 ${
+                        form.openingHours === h
+                          ? "bg-primary text-white border-primary shadow-sm"
+                          : "bg-background text-muted-foreground border-border hover:border-primary/40"
+                      }`}>
+                      {h}
+                    </button>
+                  ))}
+                </div>
+                <input type="text" className={inp}
+                  value={form.openingHours}
+                  onChange={e => setForm({ ...form, openingHours: e.target.value })}
+                  placeholder="Ya khud likho: Mon–Sat: 9am–8pm" />
+              </div>
+
+              {/* ── WhatsApp — readonly, login number ─────────── */}
+              <div>
+                <label className="text-xs font-bold text-foreground mb-1.5 block">WhatsApp Number</label>
+                <input type="tel" readOnly disabled
+                  className={`${inp} bg-muted/40 text-muted-foreground cursor-not-allowed`}
+                  value={form.whatsapp || "Not set"} />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  🔒 Ye aapka login number hai — change nahi ho sakta
+                </p>
               </div>
 
               <div>

@@ -12,6 +12,7 @@ import {
   Phone, Wrench, IndianRupee, StickyNote, Bell, Plus,
   MessageCircle, CheckCircle2, Clock, UserPlus, Hammer,
   CalendarDays, SplitSquareHorizontal, ChevronDown,
+  Info, Mail, MapPin, Cake, Tag, Hash, ChevronUp,
 } from "lucide-react";
 import { getWhatsAppLink } from "@/lib/whatsapp";
 import { format, isBefore, differenceInDays } from "date-fns";
@@ -62,6 +63,7 @@ export default function CustomerDetail() {
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAllActivity, setShowAllActivity] = useState(false);
+  const [showMoreInfo, setShowMoreInfo] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "", phone: "", email: "", address: "", birthday: "",
@@ -343,7 +345,113 @@ export default function CustomerDetail() {
                 className="mt-4 w-full bg-[#25D366] text-white py-3.5 rounded-2xl font-bold flex items-center justify-center gap-2.5 active:scale-95 transition-all shadow-md shadow-[#25D366]/25 text-[15px]">
                 <MessageCircle className="w-5 h-5" /> WhatsApp pe Message Karo
               </button>
+
+              {/* More Info toggle */}
+              <button
+                onClick={() => setShowMoreInfo(v => !v)}
+                className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-primary bg-primary/8 hover:bg-primary/12 active:scale-[0.98] transition">
+                <Info className="w-4 h-4" />
+                {showMoreInfo ? "Hide details" : "More Info"}
+                {showMoreInfo
+                  ? <ChevronUp className="w-4 h-4" />
+                  : <ChevronDown className="w-4 h-4" />}
+              </button>
             </div>
+
+            {/* ①.5  MORE INFO — expandable details ────────────── */}
+            {showMoreInfo && (() => {
+              const c = customer;
+              type Row = { icon: any; label: string; value: React.ReactNode };
+              const rows: Row[] = [];
+              rows.push({ icon: Phone, label: "Phone", value: c.phone || <span className="italic text-muted-foreground/60">Not set</span> });
+              if (c.email)        rows.push({ icon: Mail, label: "Email", value: c.email });
+              if (c.address)      rows.push({ icon: MapPin, label: "Address", value: c.address });
+              if (c.birthday)     rows.push({ icon: Cake, label: "Birthday", value: format(new Date(c.birthday), "d MMM yyyy") });
+              if (c.serviceType)  rows.push({ icon: Wrench, label: "Service type", value: c.serviceType });
+              if (c.lastServiceDate) rows.push({ icon: CalendarDays, label: "Last service", value: format(new Date(c.lastServiceDate), "d MMM yyyy") });
+              if (c.nextServiceDate) rows.push({ icon: CalendarDays, label: "Next service", value: format(new Date(c.nextServiceDate), "d MMM yyyy") });
+
+              return (
+                <div className="bg-card rounded-3xl border border-border/50 shadow-sm p-4 space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                  {/* Money summary */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-3 border border-green-100 dark:border-green-900/30">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-green-700 dark:text-green-400">Total Earned</p>
+                      <p className="text-xl font-display font-bold text-green-600 dark:text-green-400 mt-0.5 flex items-center">
+                        <IndianRupee className="w-4 h-4" />{totalEarned.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className={`rounded-2xl p-3 border ${
+                      balanceDue > 0
+                        ? "bg-orange-50 dark:bg-orange-900/20 border-orange-100 dark:border-orange-900/30"
+                        : "bg-muted/40 border-border/40"
+                    }`}>
+                      <p className={`text-[10px] font-bold uppercase tracking-wide ${
+                        balanceDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-muted-foreground"
+                      }`}>Balance Due</p>
+                      <p className={`text-xl font-display font-bold mt-0.5 flex items-center ${
+                        balanceDue > 0 ? "text-orange-500" : "text-muted-foreground"
+                      }`}>
+                        <IndianRupee className="w-4 h-4" />{balanceDue.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Tags */}
+                  {tagList.length > 0 && (
+                    <div className="bg-muted/40 rounded-2xl px-3 py-2.5 flex items-start gap-2.5">
+                      <Tag className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1">Tags</p>
+                        <div className="flex flex-wrap gap-1">
+                          {tagList.map(t => (
+                            <span key={t} className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Detail rows */}
+                  {rows.map((r, i) => (
+                    <div key={i} className="bg-muted/30 rounded-2xl px-3 py-2.5 flex items-start gap-2.5">
+                      <r.icon className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{r.label}</p>
+                        <p className="text-sm font-semibold text-foreground break-words">{r.value}</p>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Notes */}
+                  {c.notes && (
+                    <div className="bg-muted/30 rounded-2xl px-3 py-2.5 flex items-start gap-2.5">
+                      <StickyNote className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Notes</p>
+                        <p className="text-sm text-foreground whitespace-pre-wrap break-words">{c.notes}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Meta */}
+                  <div className="bg-muted/20 rounded-2xl px-3 py-2.5 flex items-center gap-2.5">
+                    <Hash className="w-4 h-4 text-muted-foreground/70 flex-shrink-0" />
+                    <div className="flex-1 min-w-0 flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground font-medium">Customer ID</span>
+                      <span className="text-[11px] text-muted-foreground font-mono">#{c.id}</span>
+                    </div>
+                  </div>
+                  {c.createdAt && (
+                    <p className="text-[11px] text-center text-muted-foreground/70 pt-1">
+                      Added {format(new Date(c.createdAt), "d MMM yyyy")}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* ②  ACTIONS ───────────────────────────────────────── */}
             <div className="grid grid-cols-2 gap-3">
