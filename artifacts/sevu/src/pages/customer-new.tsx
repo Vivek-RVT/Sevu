@@ -74,7 +74,7 @@ export default function CustomerNew() {
     setPhoneNumber(digits.slice(0, selectedCountry.digits));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (phoneNumber.length < 6) { setError("Enter a valid phone number."); return; }
     setError("");
@@ -99,9 +99,9 @@ export default function CustomerNew() {
       createdAt: new Date().toISOString(),
     } as any;
 
-    // Inject the optimistic customer into EVERY existing /api/customers cache slot
-    // (the customers page key includes a `search` param, so we patch all matching keys
-    // and also seed the no-search key so the list shows it instantly on navigate).
+    // Cancel any in-flight customer fetches so they can't overwrite the
+    // optimistic entry, then inject it into every /api/customers cache slot.
+    await queryClient.cancelQueries({ queryKey: ["/api/customers"] });
     queryClient.setQueriesData<Customer[]>(
       { queryKey: ["/api/customers"] },
       old => [optimistic, ...(old ?? [])],
@@ -131,27 +131,34 @@ export default function CustomerNew() {
       createCustomer.mutate(
         { data: payload },
         {
-          onSuccess: async (real) => {
-            // Replace the temp entry in every customers cache slot with the real one
+          onSuccess: (real) => {
+            // Replace the temp entry in every customers cache slot with the real one.
+            // If a racing refetch wiped the cache, ensure the new customer is still added.
             queryClient.setQueriesData<Customer[]>(
               { queryKey: ["/api/customers"] },
               old => {
-                if (!old) return old;
-                const hasTemp = old.some(c => c.id === tempId);
+                const list = old ?? [];
+                const hasTemp = list.some(c => c.id === tempId);
                 if (hasTemp) {
-                  return old.map(c => c.id === tempId ? (real as Customer) : c);
+                  return list.map(c => c.id === tempId ? (real as Customer) : c);
                 }
-                if (old.some(c => c.phone === (real as Customer).phone)) return old;
-                return [real as Customer, ...old];
+                if (list.some(c => c.phone === (real as Customer).phone)) return list;
+                return [real as Customer, ...list];
               },
             );
+            // Force a fresh fetch on the customers list (which the user just
+            // navigated to) AND on the dashboard so their data is consistent
+            // with the server. This cancels any stale in-flight requests.
+            queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
             queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+            queryClient.invalidateQueries({ queryKey: ["customers-dash"] });
           },
           onError: () => {
             queryClient.setQueriesData<Customer[]>(
               { queryKey: ["/api/customers"] },
               old => (old ?? []).filter(c => c.id !== tempId),
             );
+            queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
           },
         }
       );
