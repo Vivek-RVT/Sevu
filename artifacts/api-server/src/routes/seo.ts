@@ -1,7 +1,8 @@
 import { Router, type IRouter, type Request } from "express";
 import { db } from "@workspace/db";
-import { profilesTable } from "@workspace/db/schema";
-import { desc } from "drizzle-orm";
+import { profilesTable, profileReviewsTable } from "@workspace/db/schema";
+import { desc, eq, count, sql } from "drizzle-orm";
+import { Resvg } from "@resvg/resvg-js";
 
 const router: IRouter = Router();
 
@@ -135,6 +136,213 @@ router.get("/robots.txt", (req, res) => {
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
   res.setHeader("Cache-Control", "public, max-age=3600");
   res.send(body);
+});
+
+// ── OG image generator ────────────────────────────────────────────────────
+// Generates a 1200x630 PNG suitable for WhatsApp/FB/Twitter previews.
+// Cached in-memory per slug for 6 hours.
+
+const ogCache = new Map<string, { png: Buffer; expires: number }>();
+const OG_TTL_MS = 6 * 60 * 60 * 1000;
+
+const SERVICE_GRADIENTS: Record<string, [string, string]> = {
+  electrician:   ["#1e3c72", "#2a5298"],
+  salon:         ["#6a11cb", "#2575fc"],
+  barbershop:    ["#6a11cb", "#2575fc"],
+  plumber:       ["#134e5e", "#71b280"],
+  ac:            ["#0f2027", "#2c5364"],
+  carpenter:     ["#603813", "#b29f94"],
+  gym:           ["#ff512f", "#dd2476"],
+  fitness:       ["#ff512f", "#dd2476"],
+  doctor:        ["#1d976c", "#93f9b9"],
+  default:       ["#1a1a2e", "#16213e"],
+};
+
+function pickGradient(service: string): [string, string] {
+  const s = service.toLowerCase();
+  for (const key of Object.keys(SERVICE_GRADIENTS)) {
+    if (key !== "default" && s.includes(key)) return SERVICE_GRADIENTS[key];
+  }
+  return SERVICE_GRADIENTS.default;
+}
+
+function svgEscape(s: string): string {
+  return (s || "").replace(/[<>&'"]/g, (c) =>
+    c === "<" ? "&lt;" :
+    c === ">" ? "&gt;" :
+    c === "&" ? "&amp;" :
+    c === "'" ? "&apos;" :
+    "&quot;",
+  );
+}
+
+function truncate(s: string, max: number): string {
+  if (!s) return "";
+  return s.length > max ? s.slice(0, max - 1) + "…" : s;
+}
+
+router.get("/og/:slug.png", async (req, res) => {
+  const slug = req.params.slug;
+  if (!slug || slug.length > 200) {
+    res.status(400).send("Invalid slug");
+    return;
+  }
+
+  // Serve from cache if fresh
+  const cached = ogCache.get(slug);
+  if (cached && cached.expires > Date.now()) {
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "public, max-age=21600, s-maxage=21600");
+    res.setHeader("X-Cache", "HIT");
+    res.send(cached.png);
+    return;
+  }
+
+  const [profile] = await db
+    .select()
+    .from(profilesTable)
+    .where(eq(profilesTable.slug, slug));
+
+  if (!profile) {
+    res.status(404).send("Profile not found");
+    return;
+  }
+
+  // Recent reviews count for trust
+  const [{ value: reviewCount }] = await db
+    .select({ value: count() })
+    .from(profileReviewsTable)
+    .where(eq(profileReviewsTable.profileId, profile.id));
+
+  const [g1, g2] = pickGradient(profile.service);
+  const name = truncate(profile.name, 32);
+  const subtitle = truncate(`${profile.service} · ${profile.city}`, 50);
+  const rating = Number(profile.rating || 0).toFixed(1);
+  const ratingText = profile.totalReviews > 0 ? `★ ${rating}/5` : "★ New";
+  const jobsText = profile.totalJobs > 0
+    ? `${profile.totalJobs.toLocaleString("en-IN")} jobs done`
+    : "Just joined Sevu";
+  const reviewsText = reviewCount > 0
+    ? `${reviewCount} review${reviewCount > 1 ? "s" : ""}`
+    : "Verified business";
+  const services = (profile.servicesOffered || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+
+  // Build SVG (1200×630)
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="${g1}"/>
+      <stop offset="100%" stop-color="${g2}"/>
+    </linearGradient>
+    <linearGradient id="overlay" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="rgba(0,0,0,0)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0.55)"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#overlay)"/>
+
+  <!-- Decorative circles -->
+  <circle cx="1080" cy="80" r="180" fill="rgba(255,255,255,0.06)"/>
+  <circle cx="1150" cy="540" r="120" fill="rgba(255,255,255,0.04)"/>
+
+  <!-- Sevu watermark top-right -->
+  <g transform="translate(1050, 60)">
+    <rect x="0" y="0" width="100" height="36" rx="18" fill="rgba(255,255,255,0.18)"/>
+    <text x="50" y="24" font-family="Arial, sans-serif" font-size="18" font-weight="700"
+          fill="white" text-anchor="middle" letter-spacing="2">SEVU</text>
+  </g>
+
+  <!-- Logo placeholder block -->
+  <rect x="60" y="180" width="120" height="120" rx="24" fill="white" opacity="0.95"/>
+  <text x="120" y="263" font-family="Arial, sans-serif" font-size="72" font-weight="800"
+        fill="${g1}" text-anchor="middle">${svgEscape(profile.name.charAt(0).toUpperCase())}</text>
+
+  <!-- Verified badge -->
+  <g transform="translate(220, 195)">
+    <rect x="0" y="0" width="140" height="34" rx="17" fill="#25D366"/>
+    <text x="70" y="23" font-family="Arial, sans-serif" font-size="16" font-weight="700"
+          fill="white" text-anchor="middle">✓ VERIFIED</text>
+  </g>
+
+  <!-- Business name -->
+  <text x="220" y="270" font-family="Arial, sans-serif" font-size="56" font-weight="800"
+        fill="white">${svgEscape(name)}</text>
+
+  <!-- Subtitle -->
+  <text x="220" y="310" font-family="Arial, sans-serif" font-size="26" font-weight="500"
+        fill="rgba(255,255,255,0.85)">${svgEscape(subtitle)}</text>
+
+  <!-- Stats row -->
+  <g transform="translate(60, 380)">
+    <!-- Rating pill -->
+    <rect x="0" y="0" width="180" height="64" rx="18" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="90" y="42" font-family="Arial, sans-serif" font-size="24" font-weight="700"
+          fill="#fbbf24" text-anchor="middle">${svgEscape(ratingText)}</text>
+
+    <!-- Jobs pill -->
+    <rect x="200" y="0" width="280" height="64" rx="18" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="340" y="42" font-family="Arial, sans-serif" font-size="22" font-weight="600"
+          fill="white" text-anchor="middle">💼 ${svgEscape(jobsText)}</text>
+
+    <!-- Reviews pill -->
+    <rect x="500" y="0" width="240" height="64" rx="18" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+    <text x="620" y="42" font-family="Arial, sans-serif" font-size="22" font-weight="600"
+          fill="white" text-anchor="middle">${svgEscape(reviewsText)}</text>
+  </g>
+
+  ${services.length > 0 ? `
+  <!-- Service tags -->
+  <g transform="translate(60, 480)">
+    ${services.map((s, i) => {
+      const x = i * 280;
+      return `<g transform="translate(${x}, 0)">
+        <rect x="0" y="0" width="260" height="48" rx="12" fill="rgba(255,255,255,0.10)" stroke="rgba(255,255,255,0.20)" stroke-width="1"/>
+        <text x="130" y="32" font-family="Arial, sans-serif" font-size="18" font-weight="500"
+              fill="rgba(255,255,255,0.95)" text-anchor="middle">${svgEscape(truncate(s, 22))}</text>
+      </g>`;
+    }).join("")}
+  </g>` : ""}
+
+  <!-- Footer URL -->
+  <text x="60" y="585" font-family="Arial, sans-serif" font-size="20" font-weight="500"
+        fill="rgba(255,255,255,0.7)">sevu.in/profile/${svgEscape(slug)}</text>
+
+  ${profile.priceRange ? `
+  <text x="1140" y="585" font-family="Arial, sans-serif" font-size="20" font-weight="700"
+        fill="rgba(255,255,255,0.9)" text-anchor="end">${svgEscape(profile.priceRange)}</text>` : ""}
+
+  ${profile.phone ? `
+  <text x="1140" y="555" font-family="Arial, sans-serif" font-size="16" font-weight="500"
+        fill="rgba(255,255,255,0.6)" text-anchor="end">📞 ${svgEscape(profile.phone)}</text>` : ""}
+</svg>`;
+
+  try {
+    const resvg = new Resvg(svg, {
+      background: "white",
+      fitTo: { mode: "width", value: 1200 },
+      font: { loadSystemFonts: true, defaultFontFamily: "Arial" },
+    });
+    const pngData = resvg.render().asPng();
+    const png = Buffer.from(pngData);
+
+    ogCache.set(slug, { png, expires: Date.now() + OG_TTL_MS });
+
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "public, max-age=21600, s-maxage=21600");
+    res.setHeader("X-Cache", "MISS");
+    res.send(png);
+  } catch (err) {
+    // Fail silently with a tiny transparent PNG so social cards don't break
+    res.status(500).send("OG render failed");
+  }
 });
 
 export default router;

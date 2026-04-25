@@ -1,0 +1,20 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "9lAjrQOwshUh8NexlfjnN"
+uri = "file://attached_assets/og-preview-raj-hair-studio.png"
+type = "image"
+title = "Generated OG image (1200×630) — Raj Hair Studio"
+
+[[outputs]]
+id = "w53yh_JBaSYWBsgHHZsuD"
+uri = "file://attached_assets/og-preview-fitzone-gym.png"
+type = "image"
+title = "OG image — FitZone Gym (orange/pink fitness gradient)"
+
+[[outputs]]
+id = "uichSGOdXIHC8VPodobGr"
+uri = "file://attached_assets/og-preview-sharma-electricals.png"
+type = "image"
+title = "OG image — Sharma Electricals (electric blue gradient)"

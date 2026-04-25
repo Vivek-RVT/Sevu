@@ -1,0 +1,675 @@
+=== SEVU — ULTRA PRO MAX PROFILE UPDATE (v2) ===
+
+CONTEXT: Read the full project document first.
+Current profile page already has: hero, services, about, 
+location map, reviews, sticky bottom bar (Call/Copy/WhatsApp).
+This prompt ADDS missing layers without breaking existing UI.
+
+Files to modify:
+- artifacts/sevu/src/pages/profile-detail.tsx  (frontend)
+- artifacts/api-server/src/routes/profiles.ts   (backend)
+- artifacts/api-server/src/index.ts             (sitemap/robots)
+- lib/db/src/schema/profiles.ts                 (if schema change needed)
+
+---
+
+## ═══ PART 1: BACKEND SEO — GOD LEVEL ═══
+
+### 1A. Crawler Detection + Dynamic HTML Response
+
+In GET /api/profiles/:slug (or create a new Express route 
+GET /profile/:slug that serves HTML directly):
+
+Detect crawlers via User-Agent header:
+const isCrawler = /googlebot|bingbot|twitterbot|facebookexternalhit|
+WhatsApp|Telegram|LinkedInBot|Slackbot|Discordbot|
+applebot|DuckDuckBot/i.test(req.headers['user-agent'] || '')
+
+If isCrawler === true:
+→ Fetch full profile data from DB (business, profile, reviews, images)
+→ Return complete HTML string with ALL meta tags + JSON-LD injected
+→ This HTML is ONLY for crawlers — actual users still get React SPA
+
+The dynamic HTML must include:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- === PRIMARY SEO === -->
+  <title>{businessName} | {category} in {city} | Sevu</title>
+  <meta name="description" content="{businessName} — trusted {category} 
+  in {city}. ⭐{rating}/5 from {reviewCount} reviews · {jobsDone} jobs 
+  completed · {priceRange} · Call or WhatsApp now for {city} service.">
+  <meta name="keywords" content="{category} in {city}, {category} near me,
+  best {category} {city}, affordable {category} {city}, {businessName},
+  {category} {city} contact number, {city} {category} service, 
+  local {category} {city}">
+  <link rel="canonical" href="https://sevu.in/profile/{slug}">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta name="googlebot" content="index, follow">
+  <meta name="geo.region" content="IN-PB">
+  <meta name="geo.placename" content="{city}">
+
+  <!-- === OPEN GRAPH (WhatsApp/FB/LinkedIn/Telegram) === -->
+  <meta property="og:type" content="business.business">
+  <meta property="og:site_name" content="Sevu — Local Business Profiles">
+  <meta property="og:title" content="{businessName} ✓ | {category} in {city}">
+  <meta property="og:description" content="⭐ {rating}/5 · {jobsDone} 
+  jobs done · 📞 {phone} · {workingHours} · {priceRange}
+  Tap to view full profile & contact directly.">
+  <meta property="og:image" content="https://sevu.in/api/og/{slug}.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="{businessName} - {category} 
+  in {city} - Sevu Profile">
+  <meta property="og:url" content="https://sevu.in/profile/{slug}">
+  <meta property="og:locale" content="en_IN">
+  <meta property="business:contact_data:street_address" content="{address}">
+  <meta property="business:contact_data:locality" content="{city}">
+  <meta property="business:contact_data:country_name" content="India">
+  <meta property="business:contact_data:phone_number" content="{phone}">
+
+  <!-- === TWITTER CARD === -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{businessName} | {category} in {city}">
+  <meta name="twitter:description" content="⭐ {rating}/5 · {jobsDone} 
+  jobs · {priceRange} · Contact now">
+  <meta name="twitter:image" content="https://sevu.in/api/og/{slug}.png">
+  <meta name="twitter:image:alt" content="{businessName} Sevu Profile">
+
+  <!-- === JSON-LD: LocalBusiness Schema === -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "LocalBusiness",
+        "@id": "https://sevu.in/profile/{slug}#business",
+        "name": "{businessName}",
+        "description": "{bio}",
+        "url": "https://sevu.in/profile/{slug}",
+        "telephone": "{phone}",
+        "image": ["{bannerUrl}", "{profilePhotoUrl}"],
+        "logo": "{profilePhotoUrl}",
+        "priceRange": "{priceRange}",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "{address}",
+          "addressLocality": "{city}",
+          "addressRegion": "Punjab",
+          "addressCountry": "IN"
+        },
+        "openingHoursSpecification": {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": ["Monday","Tuesday","Wednesday",
+                        "Thursday","Friday","Saturday"],
+          "opens": "09:00",
+          "closes": "20:00"
+        },
+        "aggregateRating": {
+          "@type": "AggregateRating",
+          "ratingValue": "{rating}",
+          "reviewCount": "{reviewCount}",
+          "bestRating": "5",
+          "worstRating": "1"
+        },
+        "review": [
+          {
+            "@type": "Review",
+            "author": {"@type": "Person", "name": "{reviewerName}"},
+            "reviewRating": {
+              "@type": "Rating",
+              "ratingValue": "{stars}",
+              "bestRating": "5"
+            },
+            "reviewBody": "{reviewText}",
+            "datePublished": "{reviewDate}"
+          }
+        ],
+        "hasOfferCatalog": {
+          "@type": "OfferCatalog",
+          "name": "Services",
+          "itemListElement": [
+            {
+              "@type": "Offer",
+              "itemOffered": {
+                "@type": "Service",
+                "name": "{serviceName}"
+              }
+            }
+          ]
+        },
+        "sameAs": ["https://wa.me/{phoneDigitsOnly}"],
+        "potentialAction": [
+          {
+            "@type": "CommunicateAction",
+            "target": "https://wa.me/{phoneDigitsOnly}",
+            "name": "WhatsApp Now"
+          },
+          {
+            "@type": "CommunicateAction", 
+            "target": "tel:{phone}",
+            "name": "Call Now"
+          }
+        ]
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {"@type":"ListItem","position":1,
+           "name":"Home","item":"https://sevu.in"},
+          {"@type":"ListItem","position":2,
+           "name":"Services","item":"https://sevu.in/profile"},
+          {"@type":"ListItem","position":3,
+           "name":"{category} in {city}",
+           "item":"https://sevu.in/profile?category={category}&city={city}"},
+          {"@type":"ListItem","position":4,
+           "name":"{businessName}",
+           "item":"https://sevu.in/profile/{slug}"}
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What services does {businessName} offer in {city}?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "{businessName} offers {servicesList} in {city}. 
+              Price range: {priceRange}."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What are {businessName} working hours?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "{businessName} works {workingHours} in {city}."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How to contact {businessName} in {city}?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "You can contact {businessName} by calling {phone} 
+              or via WhatsApp at {phone}. Located at {address}, {city}."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is {businessName} trusted and verified?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "{businessName} has {reviewCount} verified reviews 
+              with an average rating of {rating}/5 and has completed 
+              {jobsDone} jobs in {city}."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <!-- Minimal fallback content for crawlers -->
+  <h1>{businessName} — {category} in {city}</h1>
+  <p>{bio}</p>
+  <p>Rating: {rating}/5 · {jobsDone} jobs done · {phone}</p>
+  <p>{address}, {city}</p>
+  <a href="https://wa.me/{phoneDigitsOnly}">WhatsApp Now</a>
+  <a href="tel:{phone}">Call Now</a>
+</body>
+</html>
+```
+
+### 1B. OG Image Generator — GET /api/og/:slug.png
+
+Install: `pnpm add @resvg/resvg-js` (fast SVG→PNG, no Chrome needed)
+
+Generate a 1200×630 PNG dynamically from profile data:
+
+Visual layout of generated image:
+```
+┌─────────────────────────────────────────────────────────────┐
+│ [Banner image as BG, dark overlay 60% opacity]             │
+│                                                             │
+│  ┌──────┐                                                   │
+│  │ Logo │  {BusinessName}  ✓ Verified          [SEVU logo] │
+│  │ 80px │  {Category} · {City}                             │
+│  └──────┘                                                   │
+│                                                             │
+│   ⭐ {rating}/5     💼 {jobsDone} jobs     📞 {phone}      │
+│                                                             │
+│  [{service1}]  [{service2}]  [{service3}]                  │
+│                                                             │
+│  sevu.in/profile/{slug}              {priceRange}          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+Colors: Dark overlay #0a0a0a at 70%, white text, 
+green accent #25D366 for verified badge,
+Sevu brand color for logo bottom right.
+
+If no banner: use category-based gradient
+- Electrician: #1e3c72 → #2a5298
+- Salon: #6a11cb → #2575fc  
+- Plumber: #134e5e → #71b280
+- AC Repair: #0f2027 → #203a43 → #2c5364
+- Default: #1a1a2e → #16213e
+
+Cache generated PNG for 6 hours per slug.
+Return with headers:
+Content-Type: image/png
+Cache-Control: public, max-age=21600
+
+### 1C. Sitemap.xml — GET /sitemap.xml
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://sevu.in/</loc>
+    <priority>1.0</priority>
+    <changefreq>weekly</changefreq>
+  </url>
+  <url>
+    <loc>https://sevu.in/profile</loc>
+    <priority>0.9</priority>
+    <changefreq>daily</changefreq>
+  </url>
+  <!-- For each profile in DB: -->
+  <url>
+    <loc>https://sevu.in/profile/{slug}</loc>
+    <lastmod>{updatedAt in YYYY-MM-DD}</lastmod>
+    <priority>0.8</priority>
+    <changefreq>weekly</changefreq>
+    <image:image>
+      <image:loc>{bannerImageUrl}</image:loc>
+      <image:title>{businessName} - {category} in {city}</image:title>
+    </image:image>
+  </url>
+</urlset>
+```
+
+### 1D. Robots.txt — GET /robots.txt
+```
+User-agent: *
+Allow: /
+Allow: /profile/
+Allow: /profile
+Disallow: /app/
+Disallow: /api/
+Allow: /api/og/
+
+Sitemap: https://sevu.in/sitemap.xml
+```
+
+### 1E. Performance Headers
+Add to all GET /profile/:slug responses:
+```
+Cache-Control: public, max-age=300, stale-while-revalidate=600
+X-Robots-Tag: index, follow
+Vary: User-Agent
+```
+
+---
+
+## ═══ PART 2: FRONTEND UI — CONVERSION PSYCHOLOGY ═══
+
+File: artifacts/sevu/src/pages/profile-detail.tsx
+
+Looking at current screenshots, the UI already has:
+✅ Hero with banner, photo, verified badge
+✅ Rating + jobs done stats  
+✅ WhatsApp Now (prominent green) + Send Request + Call Now
+✅ Services list with price range
+✅ About section
+✅ Location map (OpenStreetMap)
+✅ Reviews with rating breakdown + write review form
+✅ Sticky bottom bar (Call / Copy No. / WhatsApp)
+✅ "Grow with Sevu" footer CTA
+
+DO NOT BREAK any of above. Only IMPROVE + ADD:
+
+### 2A. Hero Section — Psychological Improvements
+
+CURRENT issue: "2 happy customers" looks weak next to "840 jobs done"
+FIX: Change "happy customers" label to "repeat customers" 
+or remove it if count < 5. Add instead:
+
+```
+[⭐⭐⭐⭐⭐ 4.8]  [💼 840 jobs]  [15+ yrs exp]
+```
+Three trust pills — always 3, pick most impressive metrics.
+
+ADD: Trust urgency indicator below stats (only show if jobsDone > 10):
+```
+🔥 Highly Active — {jobsDone} jobs completed
+```
+Small green text, subtle, psychology of social proof.
+
+ADD: "Open Now" badge positioning — 
+Currently top-right of banner. 
+Make it pulse with a soft green animation:
+```css
+@keyframes pulse-green {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(37,211,102,0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(37,211,102,0); }
+}
+```
+This draws eye to availability signal.
+
+IMPROVE WhatsApp button:
+Current: "WhatsApp Now — Free & instant" ✅ (good copy)
+Add subtle left-right shimmer animation every 4 seconds:
+```css
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+background: linear-gradient(90deg, 
+  #25D366 40%, #20b858 50%, #25D366 60%);
+background-size: 200% auto;
+animation: shimmer 4s linear infinite;
+```
+
+### 2B. Work Gallery Section (ADD — currently missing from screenshots)
+
+After "About" section, add before Business Info:
+
+```
+┌─────────────────────────────────────────┐
+│  📸 Work Gallery              (6 photos)│
+│ ┌──────┬──────┬──────┐                 │
+│ │      │      │      │                 │
+│ │      │      │      │                 │
+│ └──────┴──────┴──────┘                 │
+│ ┌──────┬──────┬──────┐                 │
+│ │      │      │      │                 │
+│ └──────┴──────┴──────┘                 │
+│           [View all 12 photos]          │
+└─────────────────────────────────────────┘
+```
+
+- 3-column grid, equal square cells, 2px gap
+- Tap any image → fullscreen lightbox with swipe
+- Show max 6 in grid, "View all X" button if more
+- If 0 photos: hide section entirely (don't show empty state 
+  to visitors — owner sees it in their own app)
+- Images lazy loaded with blur placeholder
+
+### 2C. Posts Section (ADD — currently missing)
+
+After Work Gallery, before Business Info:
+
+```
+┌─────────────────────────────────────────┐
+│  📋 Recent Work Posts                   │
+│                                         │
+│ ┌────────────────────┐ ┌──────────────┐ │
+│ │    Post image      │ │  Post image  │ │
+│ │  ●○ (2 img dots)  │ │              │ │
+│ │ Caption text here  │ │ Caption...   │ │
+│ │ Apr 25             │ │ Apr 23       │ │
+│ └────────────────────┘ └──────────────┘ │
+│       → horizontal scroll →             │
+└─────────────────────────────────────────┘
+```
+
+- Horizontal scroll snap
+- Each card: 260px wide, rounded-xl, shadow-sm
+- If 2 images in post: show dot indicators + swipe within card
+- Caption: max 2 lines, text-sm
+- Date: text-xs text-gray-400
+
+### 2D. Share Profile Button (IMPROVE existing ↗ button)
+
+Current: Share button exists top-right (from screenshots)
+Improve the share sheet that opens:
+
+When user taps share icon, show a bottom sheet with options:
+
+```
+┌─────────────────────────────────────────┐
+│        Share {businessName}'s Profile   │
+│                                         │
+│  [WhatsApp]  [Copy Link]  [More...]     │
+│                                         │
+│  Preview of share message:              │
+│  ┌─────────────────────────────────┐    │
+│  │ *Sharma Electricals* ✅         │    │
+│  │ _Electrician in Chandigarh_     │    │
+│  │                                 │    │
+│  │ ⭐ 4.8/5 · 💼 840 jobs done   │    │
+│  │ 🕐 Daily 8am-8pm               │    │
+│  │ 💰 ₹500 – ₹50,000             │    │
+│  │ 📞 +91 XXXXXXXXXX             │    │
+│  │                                 │    │
+│  │ 👇 Profile dekho:              │    │
+│  │ sevu.in/profile/{slug}         │    │
+│  └─────────────────────────────────┘    │
+│              [Copy this message]        │
+└─────────────────────────────────────────┘
+```
+
+WhatsApp button: opens wa.me/?text=encodedMessage
+Copy Link: copies sevu.in/profile/{slug}
+Copy Message: copies full formatted text above
+
+Generate share text dynamically from profile data:
+```typescript
+const shareText = `*${businessName}* ✅
+_${category} in ${city}_
+
+⭐ ${rating}/5 rating · 💼 ${jobsDone} jobs done
+🕐 ${workingHours}
+💰 ${priceRange}
+📞 ${phone}
+📍 ${address}
+
+👇 Full profile & contact:
+https://sevu.in/profile/${slug}
+
+_Verified on Sevu_`
+```
+
+### 2E. Trust Signals — Scientific Placement
+
+Psychological research: trust signals must appear 
+BEFORE the ask (CTA). Current order is correct.
+But ADD these micro-trust elements:
+
+1. Next to each review: Show "Verified Customer ✓" 
+   (already there ✓ — keep it)
+
+2. In hero, next to jobs done: 
+   Show "last active X days ago" in tiny gray text
+   → This shows the worker is still active
+
+3. At top of page (below breadcrumb, above banner):
+   A thin announcement bar IF the business is on Pro plan:
+```
+   🏆 Sevu Verified Pro Business · Trusted by Sevu
+```
+   Background: #f0fdf4 (very light green)
+   Text: #166534 (dark green)
+   Font-size: 12px, text-center, padding 6px
+
+### 2F. Color & Spacing — Final Calibration
+
+Apply these EXACT values throughout profile page:
+
+Typography scale:
+- Business name: font-size 24px, font-weight 700, 
+  color #0f172a (not pure black)
+- Section headers: font-size 16px, font-weight 600, 
+  color #1e293b
+- Body text: font-size 14px, font-weight 400, 
+  color #475569, line-height 1.6
+- Caption/meta: font-size 12px, color #94a3b8
+
+Spacing system (use ONLY these values):
+- Section gap: 16px (margin between cards)
+- Card padding: 16px internal
+- Element spacing within card: 8px, 12px, 16px
+- Page horizontal padding: 16px left/right
+
+Card styling:
+- background: #ffffff
+- border: 1px solid #f1f5f9
+- border-radius: 16px
+- box-shadow: 0 1px 3px rgba(0,0,0,0.06)
+
+Button styling:
+WhatsApp primary: 
+  background: #25D366
+  color: white
+  height: 52px
+  border-radius: 14px
+  font-size: 16px
+  font-weight: 600
+
+Call secondary:
+  background: #ffffff
+  border: 1.5px solid #2563eb
+  color: #2563eb
+  height: 48px
+  border-radius: 14px
+
+Send Request secondary:
+  background: #4f46e5
+  color: white
+  height: 48px
+  border-radius: 14px
+
+Sticky bottom bar:
+  background: #ffffff
+  border-top: 1px solid #f1f5f9
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.08)
+  height: 68px
+  padding-bottom: env(safe-area-inset-bottom)
+
+---
+
+## ═══ PART 3: VITE SSR META INJECTION (Frontend) ═══
+
+Since this is Vite SPA, Google crawls JS-rendered pages 
+but slower. Add react-helmet-async for dynamic meta:
+
+Install: `pnpm --filter @workspace/sevu add react-helmet-async`
+
+In profile-detail.tsx, add HelmetProvider at root 
+and in profile page:
+
+```typescript
+import { Helmet } from 'react-helmet-async'
+
+// Inside component:
+<Helmet>
+  <title>{profile.businessName} | {profile.category} 
+  in {profile.city} | Sevu</title>
+  <meta name="description" content={`${profile.businessName} 
+  — trusted ${profile.category} in ${profile.city}. 
+  ⭐${profile.rating}/5 · ${profile.jobsDone} jobs done`} />
+  <meta property="og:title" content={`${profile.businessName} 
+  ✓ | ${profile.category} in ${profile.city}`} />
+  <meta property="og:image" 
+  content={`https://sevu.in/api/og/${profile.slug}.png`} />
+  <meta property="og:url" 
+  content={`https://sevu.in/profile/${profile.slug}`} />
+  <link rel="canonical" 
+  href={`https://sevu.in/profile/${profile.slug}`} />
+</Helmet>
+```
+
+---
+
+## ═══ PART 4: PROFILE DIRECTORY PAGE SEO ═══
+
+File: artifacts/sevu/src/pages/profile.tsx (directory listing)
+
+ADD to directory page:
+- H1 tag: "Find Local Service Professionals Near You"
+- Filter by category + city (already may exist — enhance)
+- Each listing card: show rating, jobs done, city, 
+  category chip, "View Profile →" CTA
+- Meta description for directory page mentioning 
+  top categories
+
+Add to Express for directory:
+```html
+<title>Local Service Professionals | Electricians, 
+Plumbers, Salons Near You | Sevu</title>
+<meta name="description" content="Find trusted local 
+electricians, plumbers, AC repair, salons and more 
+in your city. Verified professionals with real reviews 
+on Sevu.">
+```
+
+---
+
+## ═══ PART 5: IMPLEMENTATION ORDER ═══
+
+Do in this exact order:
+
+Step 1 (Backend first — no UI risk):
+[ ] Install @resvg/resvg-js + react-helmet-async
+[ ] Create GET /api/og/:slug.png endpoint
+[ ] Create GET /sitemap.xml endpoint  
+[ ] Create GET /robots.txt endpoint
+[ ] Add crawler detection to GET /profile/:slug
+[ ] Test OG image: curl https://sevu.in/api/og/sharma-electricals-chandigarh.png
+
+Step 2 (Frontend meta):
+[ ] Add react-helmet-async to App.tsx root
+[ ] Add Helmet tags to profile-detail.tsx
+[ ] Verify with: https://search.google.com/test/rich-results
+[ ] Test WhatsApp preview by sending link in WA
+
+Step 3 (UI additions — non-breaking):
+[ ] Work Gallery section (after About)
+[ ] Posts carousel section (after Gallery)
+[ ] Improved Share bottom sheet
+[ ] WhatsApp button shimmer animation
+[ ] Open Now badge pulse animation
+[ ] Trust urgency text below stats
+
+Step 4 (Verification):
+[ ] Google Rich Results Test — target: 0 errors
+[ ] Facebook OG Debugger — verify image shows 1200x630
+[ ] WhatsApp: send profile link, verify preview shows 
+    business name + banner image + description
+[ ] Lighthouse audit — target: SEO score 95+
+[ ] Mobile usability: all CTAs minimum 52px height
+
+---
+
+## ═══ CRITICAL NOTES ═══
+
+- NEVER break existing auth system
+- NEVER change DB schema without noting migration: 
+  `pnpm --filter @workspace/db push`
+- All new UI must support dark mode 
+  (use Tailwind dark: variants)
+- Keep existing sticky bottom bar (Call/Copy No./WhatsApp)
+  exactly as is — only style improvements allowed
+- "Made with Replit" badge: add this CSS to hide it:
+  [data-testid="replit-badge"] { display: none !important; }
+- Slug fix: ensure no duplicate category words
+  "vivek-ac-repair-ac-repair-jalandhar" → 
+  "vivek-ac-repair-jalandhar"
+- WhatsApp links format: 
+  wa.me/91{10digitPhone} (no spaces, no +)
+- Phone links: tel:+91{10digitPhone}
+- All rupee amounts: use ₹ symbol, not Rs. or INR
+
+If any step has errors, fix them before moving 
+to the next step. Do not skip steps.

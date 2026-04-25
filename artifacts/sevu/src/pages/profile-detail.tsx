@@ -7,7 +7,7 @@ import {
   ChevronLeft, ChevronRight, X, Phone, User,
   Globe, Instagram, ExternalLink, Sparkles, ArrowRight,
   CheckCircle2, DollarSign, ThumbsUp, ShieldCheck, Send, Users,
-  Navigation, Camera, Share2, Copy, Check
+  Navigation, Camera, Share2, Copy, Check, Flame, Link2
 } from "lucide-react";
 import { format } from "date-fns";
 import { getWhatsAppLink } from "@/lib/whatsapp";
@@ -193,6 +193,99 @@ function StarPicker({ value, onChange }: { value: number; onChange: (v: number) 
   );
 }
 
+/* ── Share bottom sheet ──────────────────────────────────── */
+function ShareSheet({
+  url, name, service, city, rating, totalReviews, totalJobs,
+  phone, openingHours, priceRange, address, onClose,
+}: {
+  url: string; name: string; service: string; city: string;
+  rating: number; totalReviews: number; totalJobs: number;
+  phone: string; openingHours?: string | null; priceRange?: string | null;
+  address?: string | null; onClose: () => void;
+}) {
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedMsg, setCopiedMsg] = useState(false);
+
+  const ratingLine = totalReviews > 0
+    ? `⭐ ${rating.toFixed(1)}/5 · 💼 ${totalJobs} jobs done`
+    : `🆕 New on Sevu · 💼 ${totalJobs} jobs done`;
+  const message = `*${name}* ✅
+_${service} in ${city}_
+
+${ratingLine}${openingHours ? `\n🕐 ${openingHours}` : ""}${priceRange ? `\n💰 ${priceRange}` : ""}
+📞 ${phone}${address ? `\n📍 ${address}` : ""}
+
+👇 Full profile & contact:
+${url}
+
+_Verified on Sevu_`;
+
+  const waLink = `https://wa.me/?text=${encodeURIComponent(message)}`;
+
+  const copy = async (text: string, setter: (v: boolean) => void) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setter(true);
+      setTimeout(() => setter(false), 1800);
+    } catch {}
+  };
+
+  const tryNative = async () => {
+    if (navigator.share) {
+      try { await navigator.share({ title: name, text: message, url }); onClose(); return; }
+      catch { /* user cancelled */ }
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[200] flex flex-col items-center justify-end sm:justify-center backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white w-full max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 animate-in slide-in-from-bottom-4 duration-300"
+        onClick={e => e.stopPropagation()}>
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">Share Profile</h3>
+            <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[220px]">{name}</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Action row */}
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          <a href={waLink} target="_blank" rel="noopener noreferrer"
+            className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-[#25D366] text-white active:scale-95 transition-transform">
+            <MessageCircle className="w-5 h-5" />
+            <span className="text-[11px] font-bold">WhatsApp</span>
+          </a>
+          <button onClick={() => copy(url, setCopiedLink)}
+            className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-blue-50 border border-blue-100 text-blue-700 active:scale-95 transition-transform">
+            {copiedLink ? <Check className="w-5 h-5" /> : <Link2 className="w-5 h-5" />}
+            <span className="text-[11px] font-bold">{copiedLink ? "Copied!" : "Copy Link"}</span>
+          </button>
+          <button onClick={tryNative}
+            className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-gray-100 text-gray-700 active:scale-95 transition-transform">
+            <Share2 className="w-5 h-5" />
+            <span className="text-[11px] font-bold">More…</span>
+          </button>
+        </div>
+
+        {/* Preview */}
+        <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-1.5">Message preview</p>
+        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3 text-xs text-gray-700 whitespace-pre-line font-sans leading-relaxed max-h-44 overflow-y-auto">
+          {message}
+        </div>
+
+        <button onClick={() => copy(message, setCopiedMsg)}
+          className="w-full mt-3 py-3 rounded-xl bg-gray-900 text-white font-bold text-sm active:scale-[0.98] transition-transform flex items-center justify-center gap-2">
+          {copiedMsg ? <><Check className="w-4 h-4" />Message copied!</> : <><Copy className="w-4 h-4" />Copy this message</>}
+        </button>
+      </div>
+      <div className="h-16 w-full flex-shrink-0 sm:hidden" style={{ height: "calc(4rem + env(safe-area-inset-bottom, 0px))" }} />
+    </div>
+  );
+}
+
 /* ── Reviewer info modal ─────────────────────────────────── */
 function ReviewIdentityModal({
   onDone, onClose
@@ -271,6 +364,7 @@ export default function ProfileDetail() {
 
   const [reviewer, setReviewer] = useState<ReviewerInfo | null>(() => getReviewer());
   const [showIdentityModal, setShowIdentityModal] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -317,7 +411,10 @@ export default function ProfileDetail() {
         const description = profile.description
           ? `${ratingText}${profile.description.slice(0, 150)}`
           : `${ratingText}Book ${profile.name} for ${profile.service} services in ${profile.city}. Call or WhatsApp now.`;
+        // Prefer the dynamic OG image — guarantees a 1200×630 social card
+        // even when the business has no shop photo. Falls back to real photos.
         const image =
+          `${siteOrigin()}/api/og/${profile.slug}.png` ||
           profile.shopImage ||
           profile.profileImage ||
           (profile.workImages && profile.workImages[0]) ||
@@ -390,16 +487,7 @@ export default function ProfileDetail() {
 
   /* ── Share + copy phone ── */
   const [copiedPhone, setCopiedPhone] = useState(false);
-  const handleShare = async () => {
-    if (!profile) return;
-    const url = `${siteOrigin()}/profile/${profile.slug}`;
-    const text = `Check out ${profile.name} — ${profile.service} in ${profile.city} on Sevu`;
-    if (navigator.share) {
-      try { await navigator.share({ title: profile.name, text, url }); return; }
-      catch { /* user cancelled */ }
-    }
-    try { await navigator.clipboard.writeText(url); alert("Link copied!"); } catch {}
-  };
+  const handleShare = () => setShowShare(true);
   const copyPhone = async () => {
     if (!profile) return;
     try {
@@ -599,28 +687,36 @@ export default function ProfileDetail() {
                   {profile.totalJobs} jobs done
                 </div>
               )}
-              {profile.totalReviews > 0 && (
+              {profile.totalReviews >= 5 && (
                 <div className="flex items-center gap-1 text-sm text-gray-600 font-semibold">
                   <Users className="w-4 h-4 text-blue-400" />
                   {profile.totalReviews} happy customers
                 </div>
               )}
             </div>
+
+            {/* Trust urgency — social proof for active businesses */}
+            {profile.totalJobs >= 10 && (
+              <div className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
+                <Flame className="w-3.5 h-3.5" />
+                Highly Active — {profile.totalJobs.toLocaleString("en-IN")} jobs completed
+              </div>
+            )}
           </div>
         </div>
 
         {/* ── ACTION BUTTONS ── */}
         <div className="space-y-3">
-          {/* PRIMARY: WhatsApp — pulse ring for attention */}
+          {/* PRIMARY: WhatsApp — shimmer + pulse ring for attention */}
           <div className="relative">
             <div className="absolute -inset-1 rounded-[20px] bg-[#25D366]/30 animate-pulse" />
             <a href={getWhatsAppLink(profile.whatsapp || profile.phone, whatsappMessage)}
               target="_blank" rel="noopener noreferrer"
               onClick={() => fetch(`/api/profiles/${slug}/track`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "whatsapp" }) }).catch(() => {})}
-              className="relative flex items-center justify-center gap-3 bg-[#25D366] text-white py-5 rounded-2xl font-bold shadow-lg shadow-green-500/40 active:scale-[0.98] transition-all text-lg w-full">
-              <MessageCircle className="w-6 h-6" />
-              <span>WhatsApp Now</span>
-              <span className="text-green-100 text-sm font-normal ml-1">— Free & Instant</span>
+              className="sevu-shimmer-btn relative flex items-center justify-center gap-3 text-white py-5 rounded-2xl font-bold shadow-lg shadow-green-500/40 active:scale-[0.98] transition-all text-lg w-full overflow-hidden">
+              <MessageCircle className="w-6 h-6 relative z-10" />
+              <span className="relative z-10">WhatsApp Now</span>
+              <span className="text-green-50 text-sm font-normal ml-1 relative z-10">— Free & Instant</span>
             </a>
           </div>
           {/* SECONDARY: Send Request + Call side by side */}
@@ -979,6 +1075,24 @@ export default function ProfileDetail() {
         <ReviewIdentityModal
           onDone={info => { setReviewer(info); setShowIdentityModal(false); }}
           onClose={() => setShowIdentityModal(false)}
+        />
+      )}
+
+      {/* Share bottom sheet */}
+      {showShare && (
+        <ShareSheet
+          url={`${siteOrigin()}/profile/${profile.slug}`}
+          name={profile.name}
+          service={profile.service}
+          city={profile.city}
+          rating={avgRating}
+          totalReviews={profile.totalReviews}
+          totalJobs={profile.totalJobs}
+          phone={profile.phone}
+          openingHours={profile.isAvailable24x7 ? "Open 24×7" : profile.openingHours}
+          priceRange={profile.priceRange}
+          address={profile.address}
+          onClose={() => setShowShare(false)}
         />
       )}
     </div>
