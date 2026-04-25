@@ -16,6 +16,7 @@ import {
   Plus, Trash2, ChevronLeft, Crown,
 } from "lucide-react";
 import { format } from "date-fns";
+import { compressImage } from "@/lib/compress-image";
 
 interface Analytics {
   id: number;
@@ -44,31 +45,6 @@ interface ProfilePost {
   caption: string | null;
   images: string[];
   createdAt: string;
-}
-
-async function compressImage(file: File, maxPx = 1200, quality = 0.82): Promise<File> {
-  return new Promise((resolve) => {
-    const img = document.createElement("img") as HTMLImageElement;
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      let { width, height } = img;
-      if (width > maxPx || height > maxPx) {
-        const r = Math.min(maxPx / width, maxPx / height);
-        width = Math.round(width * r); height = Math.round(height * r);
-      }
-      const c = document.createElement("canvas");
-      c.width = width; c.height = height;
-      c.getContext("2d")!.drawImage(img, 0, 0, width, height);
-      c.toBlob(b => {
-        if (!b) return resolve(file);
-        const f = new File([b], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
-        resolve(f.size < file.size ? f : file);
-      }, "image/jpeg", quality);
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
-    img.src = url;
-  });
 }
 
 const toPublicUrl = (objectPath: string) =>
@@ -245,7 +221,7 @@ export default function Analytics() {
       return;
     }
     setPostImgUploading(true);
-    const compressed = await compressImage(file, 1400, 0.85);
+    const compressed = await compressImage(file, "post");
     await postImgUpload.uploadFile(compressed);
   };
 
@@ -376,7 +352,7 @@ export default function Analytics() {
     e.target.value = "";
     if (!file) return;
     setUploadingProfile(true);
-    const compressed = await compressImage(file, 800, 0.85);
+    const compressed = await compressImage(file, "logo");
     await profileUpload.uploadFile(compressed);
   };
 
@@ -385,7 +361,7 @@ export default function Analytics() {
     e.target.value = "";
     if (!file) return;
     setUploadingShop(true);
-    const compressed = await compressImage(file, 1200, 0.85);
+    const compressed = await compressImage(file, "banner");
     await shopUpload.uploadFile(compressed);
   };
 

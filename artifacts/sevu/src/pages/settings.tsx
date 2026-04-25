@@ -19,33 +19,7 @@ import {
   Pencil, Tag, FileText, Download,
 } from "lucide-react";
 import { CATEGORY_CONFIG, JOB_TYPE_ICONS } from "@/lib/categoryConfig";
-
-async function compressImage(file: File, maxPx = 1200, quality = 0.82): Promise<File> {
-  return new Promise((resolve) => {
-    const img = document.createElement("img") as HTMLImageElement;
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      let { width, height } = img;
-      if (width > maxPx || height > maxPx) {
-        const ratio = Math.min(maxPx / width, maxPx / height);
-        width = Math.round(width * ratio);
-        height = Math.round(height * ratio);
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = width; canvas.height = height;
-      const ctx = canvas.getContext("2d")!;
-      ctx.drawImage(img, 0, 0, width, height);
-      canvas.toBlob((blob) => {
-        if (!blob) { resolve(file); return; }
-        const compressed = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
-        resolve(compressed.size < file.size ? compressed : file);
-      }, "image/jpeg", quality);
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
-    img.src = url;
-  });
-}
+import { compressImage } from "@/lib/compress-image";
 
 const CATEGORIES = [
   "Salon / Barbershop", "Gym / Fitness", "Spa / Wellness", "Plumber",
@@ -1655,17 +1629,17 @@ export default function Settings() {
             setPendingAdjust(null);
             if (type === "profile") {
               setIsCompressingPic(true);
-              const c = await compressImage(adjustedFile, 800, 0.85);
+              const c = await compressImage(adjustedFile, "logo");
               setIsCompressingPic(false);
               await profilePicUpload.uploadFile(c);
             } else if (type === "shop") {
               setIsCompressingShop(true);
-              const c = await compressImage(adjustedFile, 1200, 0.85);
+              const c = await compressImage(adjustedFile, "banner");
               setIsCompressingShop(false);
               await shopPhotoUpload.uploadFile(c);
             } else {
               setIsCompressingWork(true);
-              const c = await compressImage(adjustedFile, 1200, 0.82);
+              const c = await compressImage(adjustedFile, "work");
               setIsCompressingWork(false);
               await workPhotoUpload.uploadFile(c);
             }
