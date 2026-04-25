@@ -13,7 +13,7 @@ import {
   Phone, Wrench, IndianRupee, StickyNote, Bell, Plus,
   MessageCircle, CheckCircle2, Clock, UserPlus, Hammer,
   CalendarDays, SplitSquareHorizontal, ChevronDown,
-  Info, Mail, MapPin, Cake, Tag, Hash, ChevronUp,
+  Info, Mail, MapPin, Cake, Tag, Hash, ChevronUp, User,
 } from "lucide-react";
 import { getWhatsAppLink } from "@/lib/whatsapp";
 import { format, isBefore, differenceInDays } from "date-fns";
@@ -380,16 +380,20 @@ export default function CustomerDetail() {
 
             {/* ①.5  MORE INFO — expandable details ────────────── */}
             {showMoreInfo && (() => {
-              const c = customer;
-              type Row = { icon: any; label: string; value: React.ReactNode };
-              const rows: Row[] = [];
-              rows.push({ icon: Phone, label: "Phone", value: c.phone || <span className="italic text-muted-foreground/60">Not set</span> });
-              if (c.email)        rows.push({ icon: Mail, label: "Email", value: c.email });
-              if (c.address)      rows.push({ icon: MapPin, label: "Address", value: c.address });
-              if (c.birthday)     rows.push({ icon: Cake, label: "Birthday", value: format(new Date(c.birthday), "d MMM yyyy") });
-              if (c.serviceType)  rows.push({ icon: Wrench, label: "Service type", value: c.serviceType });
-              if (c.lastServiceDate) rows.push({ icon: CalendarDays, label: "Last service", value: format(new Date(c.lastServiceDate), "d MMM yyyy") });
-              if (c.nextServiceDate) rows.push({ icon: CalendarDays, label: "Next service", value: format(new Date(c.nextServiceDate), "d MMM yyyy") });
+              const c = customer as any;
+              const empty = <span className="italic text-muted-foreground/50 font-normal">— Not added —</span>;
+              const fmtDate = (d: string) => format(new Date(d), "d MMM yyyy");
+              type Row = { icon: any; label: string; value: React.ReactNode; filled: boolean };
+              const rows: Row[] = [
+                { icon: Phone,        label: "Phone",         filled: !!c.phone,           value: c.phone || empty },
+                { icon: Mail,         label: "Email",         filled: !!c.email,           value: c.email || empty },
+                { icon: MapPin,       label: "Address",       filled: !!c.address,         value: c.address || empty },
+                { icon: Cake,         label: "Birthday",      filled: !!c.birthday,        value: c.birthday ? fmtDate(c.birthday) : empty },
+                { icon: User,         label: "Gender",        filled: !!c.gender,          value: c.gender || empty },
+                { icon: Wrench,       label: "Service type",  filled: !!c.serviceType,     value: c.serviceType || empty },
+                { icon: CalendarDays, label: "Last service",  filled: !!c.lastServiceDate, value: c.lastServiceDate ? fmtDate(c.lastServiceDate) : empty },
+                { icon: CalendarDays, label: "Next service",  filled: !!c.nextServiceDate, value: c.nextServiceDate ? fmtDate(c.nextServiceDate) : empty },
+              ];
 
               return (
                 <div className="bg-card rounded-3xl border border-border/50 shadow-sm p-4 space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -417,12 +421,12 @@ export default function CustomerDetail() {
                     </div>
                   </div>
 
-                  {/* Tags */}
-                  {tagList.length > 0 && (
-                    <div className="bg-muted/40 rounded-2xl px-3 py-2.5 flex items-start gap-2.5">
-                      <Tag className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1">Tags</p>
+                  {/* Tags — always shown, empty sign if none */}
+                  <div className={`rounded-2xl px-3 py-2.5 flex items-start gap-2.5 ${tagList.length > 0 ? "bg-muted/40" : "bg-muted/20 border border-dashed border-border/60"}`}>
+                    <Tag className={`w-4 h-4 mt-0.5 flex-shrink-0 ${tagList.length > 0 ? "text-muted-foreground" : "text-muted-foreground/50"}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1">Tags</p>
+                      {tagList.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
                           {tagList.map(t => (
                             <span key={t} className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
@@ -430,31 +434,54 @@ export default function CustomerDetail() {
                             </span>
                           ))}
                         </div>
-                      </div>
+                      ) : (
+                        <p className="text-sm italic text-muted-foreground/50 font-normal">— Not added —</p>
+                      )}
                     </div>
-                  )}
+                  </div>
 
-                  {/* Detail rows */}
+                  {/* Detail rows — every field always shown, empty sign when blank */}
                   {rows.map((r, i) => (
-                    <div key={i} className="bg-muted/30 rounded-2xl px-3 py-2.5 flex items-start gap-2.5">
-                      <r.icon className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <div key={i} className={`rounded-2xl px-3 py-2.5 flex items-start gap-2.5 ${r.filled ? "bg-muted/30" : "bg-muted/15 border border-dashed border-border/60"}`}>
+                      <r.icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${r.filled ? "text-muted-foreground" : "text-muted-foreground/50"}`} />
                       <div className="flex-1 min-w-0">
                         <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{r.label}</p>
-                        <p className="text-sm font-semibold text-foreground break-words">{r.value}</p>
+                        <p className={`text-sm break-words ${r.filled ? "font-semibold text-foreground" : ""}`}>{r.value}</p>
                       </div>
                     </div>
                   ))}
 
-                  {/* Notes */}
-                  {c.notes && (
-                    <div className="bg-muted/30 rounded-2xl px-3 py-2.5 flex items-start gap-2.5">
-                      <StickyNote className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Notes</p>
-                        <p className="text-sm text-foreground whitespace-pre-wrap break-words">{c.notes}</p>
-                      </div>
+                  {/* Notes — always shown, empty sign if blank */}
+                  <div className={`rounded-2xl px-3 py-2.5 flex items-start gap-2.5 ${c.notes ? "bg-muted/30" : "bg-muted/15 border border-dashed border-border/60"}`}>
+                    <StickyNote className={`w-4 h-4 mt-0.5 flex-shrink-0 ${c.notes ? "text-muted-foreground" : "text-muted-foreground/50"}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Notes</p>
+                      {c.notes ? (
+                        <p className="text-sm text-foreground whitespace-pre-wrap break-words font-semibold">{c.notes}</p>
+                      ) : (
+                        <p className="text-sm italic text-muted-foreground/50 font-normal">— Not added —</p>
+                      )}
                     </div>
-                  )}
+                  </div>
+
+                  {/* Quick "fill missing details" CTA */}
+                  {(() => {
+                    const missingCount =
+                      rows.filter(r => !r.filled).length
+                      + (tagList.length === 0 ? 1 : 0)
+                      + (c.notes ? 0 : 1);
+                    if (missingCount === 0) return null;
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => { setShowMoreInfo(false); setIsEditing(true); }}
+                        className="w-full mt-1 py-2.5 rounded-xl text-xs font-bold text-primary bg-primary/8 hover:bg-primary/12 active:scale-[0.98] transition flex items-center justify-center gap-1.5"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        {missingCount} detail{missingCount > 1 ? "s" : ""} missing — tap to add
+                      </button>
+                    );
+                  })()}
 
                   {/* Meta */}
                   <div className="bg-muted/20 rounded-2xl px-3 py-2.5 flex items-center gap-2.5">
