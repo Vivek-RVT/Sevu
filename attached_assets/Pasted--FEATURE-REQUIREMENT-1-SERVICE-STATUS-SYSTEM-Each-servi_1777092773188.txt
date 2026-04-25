@@ -1,0 +1,110 @@
+== FEATURE REQUIREMENT ===
+
+1. SERVICE STATUS SYSTEM
+Each service log has two independent statuses:
+- Completion Status: "pending" | "completed"
+- Payment Status: "unpaid" | "paid"
+
+Add a "Mark Complete" button on service cards 
+(separate from existing "Mark Paid" button)
+
+When worker clicks "Mark Complete":
+→ status changes to "completed"
+→ Jobs Done counter increments by 1
+→ Profile updates in real-time
+
+Jobs Done = count of all services 
+where completionStatus === "completed"
+(regardless of payment status)
+
+---
+
+2. ANTI-SPAM RULES (enforce all 3)
+
+Rule 1 — Duplicate Block:
+If same customerId already has a service 
+logged today with status "completed",
+block new completion with message:
+"Aaj is customer ka kaam pehle 
+se complete mark hua hai"
+
+Rule 2 — Minimum Time Gap:
+Service can only be marked complete
+minimum 30 minutes after it was created.
+If attempted before 30 mins:
+"Job abhi add ki hai, 
+30 minute baad complete karen"
+
+Rule 3 — Daily Cap by Plan:
+- Starter plan: max 5 completions/day
+- Growth plan: max 15 completions/day  
+- Pro plan: max 30 completions/day
+If cap reached: "Aaj ki limit 
+poori ho gayi hai"
+
+---
+
+3. UNDO OPTION
+After marking complete, show undo button
+for 10 minutes only.
+After 10 mins, undo is disabled.
+
+---
+
+4. DELETE HANDLING
+If a completed service is deleted:
+→ Jobs Done counter decrements by 1
+
+---
+
+5. UI CHANGES NEEDED
+
+Service Card buttons (in order):
+[ Mark Complete ✓ ] [ Mark Paid ₹ ] [ View ] [ Delete ]
+
+Mark Complete button:
+- Color: green when pending
+- Color: gray + checkmark when already completed
+- Disabled state after completion 
+  (with undo timer showing)
+
+Profile display:
+"💼 X jobs done"
+Pull this number from 
+completed services count query
+
+---
+
+6. DATABASE CHANGES NEEDED
+
+Services table — add fields:
+- completionStatus: enum ["pending", "completed"]
+- completedAt: timestamp (null by default)
+
+---
+
+7. API ENDPOINTS NEEDED
+
+PATCH /services/:id/complete
+→ validates all 3 anti-spam rules
+→ updates completionStatus = "completed"
+→ sets completedAt = now()
+→ returns updated service + new jobs count
+
+PATCH /services/:id/undo-complete
+→ only works if completedAt < 10 mins ago
+→ resets completionStatus = "pending"
+→ clears completedAt
+
+GET /workers/:id/jobs-count
+→ returns count of completed services
+→ used for profile display
+
+---
+
+IMPORTANT NOTES:
+- Jobs Done and Earnings are completely 
+  independent metrics
+- Do not tie job completion to payment
+- All anti-spam checks happen on backend,
+  not just frontend
