@@ -14,10 +14,17 @@ import { getWhatsAppLink, formatReminderMessage, formatReviewMessage } from "@/l
 import {
   Bell, CheckCircle2, MessageCircle, Star, Users, Loader2, Plus,
   IndianRupee, Clock, CalendarDays, TrendingUp, ClipboardList,
-  ChevronRight, Cake, Sparkles, ArrowUpRight, Wrench
+  ChevronRight, Cake, Sparkles, ArrowUpRight, Wrench, Crown, Zap
 } from "lucide-react";
+import { getPlan } from "@/lib/plans";
 import { MobileLayout } from "@/components/layout/MobileLayout";
 import { haptic } from "@/lib/haptic";
+
+const planBadge: Record<string, { Icon: any; label: string; bg: string }> = {
+  starter: { Icon: Sparkles, label: "Starter", bg: "bg-white/15 hover:bg-white/25 border border-white/30 text-white" },
+  growth:  { Icon: Zap,      label: "Growth",  bg: "bg-white/20 hover:bg-white/30 border border-white/40 text-white" },
+  pro:     { Icon: Crown,    label: "Pro",     bg: "bg-amber-400/95 hover:bg-amber-400 border border-amber-300 text-amber-950" },
+};
 
 interface ServiceLog {
   id: number;
@@ -198,8 +205,29 @@ export default function Dashboard() {
         <div className="bg-gradient-to-br from-primary to-secondary rounded-3xl p-5 text-white shadow-xl shadow-primary/20 relative overflow-hidden">
           <div className="absolute -right-6 -top-6 w-32 h-32 bg-white/10 rounded-full" />
           <div className="absolute -right-2 -bottom-8 w-20 h-20 bg-white/5 rounded-full" />
-          <p className="text-white/80 text-sm font-medium mb-0.5">{format(new Date(), "EEEE, MMMM d")}</p>
-          <h1 className="text-2xl font-display font-bold leading-tight">
+
+          {/* Top row: date + plan badge */}
+          <div className="flex items-start justify-between gap-3 relative z-10">
+            <p className="text-white/80 text-sm font-medium mb-0.5">{format(new Date(), "EEEE, MMMM d")}</p>
+            {(() => {
+              const planId = getPlan(business?.plan).id;
+              const b = planBadge[planId] ?? planBadge.starter;
+              const Icon = b.Icon;
+              return (
+                <button
+                  onClick={() => { haptic("light"); setLocation("/app/upgrade"); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold backdrop-blur-sm transition-all active:scale-95 shadow-sm ${b.bg}`}
+                  data-testid="button-plan-badge"
+                  aria-label={`Current plan: ${b.label}. Tap to manage plan.`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{b.label}</span>
+                </button>
+              );
+            })()}
+          </div>
+
+          <h1 className="text-2xl font-display font-bold leading-tight relative z-10">
             {greeting()},<br />
             <span className="text-white/90">{business?.name || "your shop"} 👋</span>
           </h1>
