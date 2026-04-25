@@ -17,6 +17,7 @@ const CustomerNew     = lazy(() => import("./pages/customer-new"));
 const CustomerDetail  = lazy(() => import("./pages/customer-detail"));
 const Services        = lazy(() => import("./pages/services"));
 const Settings        = lazy(() => import("./pages/settings"));
+const Upgrade         = lazy(() => import("./pages/upgrade"));
 const ProfileDirectory = lazy(() => import("./pages/profile-directory"));
 const ProfileDetail   = lazy(() => import("./pages/profile-detail"));
 const Analytics       = lazy(() => import("./pages/analytics"));
@@ -193,6 +194,9 @@ function Router() {
         </Route>
         <Route path="/app/settings">
           <ProtectedRoute component={Settings} />
+        </Route>
+        <Route path="/app/upgrade">
+          <ProtectedRoute component={Upgrade} />
         </Route>
 
         <Route component={NotFound} />

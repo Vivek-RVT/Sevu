@@ -12,6 +12,7 @@ export const businessesTable = pgTable("businesses", {
   reviewLink: text("review_link"),
   defaultReminderMessage: text("default_reminder_message"),
   defaultReviewMessage: text("default_review_message"),
+  plan: text("plan").default("starter").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

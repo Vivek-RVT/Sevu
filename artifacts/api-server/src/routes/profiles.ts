@@ -2,8 +2,9 @@ import { Router, type IRouter } from "express";
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { db } from "@workspace/db";
-import { profilesTable, profileReviewsTable, profilePostsTable } from "@workspace/db/schema";
+import { profilesTable, profileReviewsTable, profilePostsTable, businessesTable } from "@workspace/db/schema";
 import { eq, ilike, desc, and, count, sql } from "drizzle-orm";
+import { getPlanLimits } from "../lib/plans.js";
 import { requireAuth } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
 import {
@@ -359,6 +360,27 @@ router.post(
 
     if (profile.businessId !== req.auth!.businessId) {
       res.status(403).json({ error: "Access denied. You do not own this profile." });
+      return;
+    }
+
+    // Enforce plan-based post limit
+    const [biz] = await db
+      .select({ plan: businessesTable.plan })
+      .from(businessesTable)
+      .where(eq(businessesTable.id, profile.businessId));
+    const limits = getPlanLimits(biz?.plan);
+    const [{ value: currentCount }] = await db
+      .select({ value: count() })
+      .from(profilePostsTable)
+      .where(eq(profilePostsTable.profileId, profile.id));
+    if (currentCount >= limits.maxPosts) {
+      res.status(403).json({
+        error: "POST_LIMIT_REACHED",
+        message: `Apke plan mein sirf ${limits.maxPosts} posts allowed hain. Upgrade karke aur posts add karein.`,
+        plan: biz?.plan ?? "starter",
+        maxPosts: limits.maxPosts,
+        currentCount,
+      });
       return;
     }
 

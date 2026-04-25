@@ -47,6 +47,7 @@ artifacts-monorepo/
 - **Review Requests**: Send review requests via WhatsApp after marking done
 - **Settings**: Edit business info, custom reminder/review messages, review link
 - **Public Profile + Posts**: Each business can publish a public profile (`/profile/:slug`) with reviews, work gallery, and "Posts" — carousel posts with 1 or 2 photos + caption (table: `profile_posts`, routes: `GET/POST/DELETE /api/profiles/:slug/posts`)
+- **Plans / Pricing**: 3 tiers — Starter (₹49 launch / ₹99 reg, 10 posts), Growth (₹99 / ₹199, 15 posts, WhatsApp alerts), Pro (₹149 / ₹299, 20 posts, PDF export, priority listing). Plan stored in `businesses.plan` (default `"starter"`). Post limits enforced server-side in `POST /api/profiles/:slug/posts` returning `error: "POST_LIMIT_REACHED"`. Pricing page at `/app/upgrade`. Plan config: `artifacts/sevu/src/lib/plans.ts` (UI) + `artifacts/api-server/src/lib/plans.ts` (limits)
 
 ## Auth System
 

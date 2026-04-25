@@ -951,6 +951,18 @@ export default function Settings() {
                   </p>
                 </div>
 
+                <button type="button" onClick={() => setLocation("/app/upgrade")}
+                  className="w-full py-4 px-5 rounded-2xl font-bold text-sm flex items-center justify-between gap-2 transition-all bg-gradient-to-r from-primary/10 via-secondary/10 to-primary/10 border-2 border-primary/30 hover:from-primary/15 hover:to-primary/15 active:scale-[0.99]">
+                  <span className="flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-xl bg-primary text-white flex items-center justify-center">★</span>
+                    <span className="flex flex-col items-start">
+                      <span className="text-foreground">Upgrade plan</span>
+                      <span className="text-[11px] font-normal text-muted-foreground">Aur posts, WhatsApp alerts & more</span>
+                    </span>
+                  </span>
+                  <span className="text-primary text-lg">→</span>
+                </button>
+
                 <button type="button" onClick={() => logout().then(() => setLocation("/app/login"))} 
                   className="w-full py-4 text-muted-foreground hover:text-red-500 bg-muted hover:bg-red-50 dark:hover:bg-red-900/10 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 transition-all border-2 border-transparent hover:border-red-200 dark:hover:border-red-900/30">
                   <LogOut className="w-4 h-4" /> Log Out

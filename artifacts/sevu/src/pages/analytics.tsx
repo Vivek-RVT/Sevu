@@ -4,13 +4,15 @@ import { useLocation, Redirect } from "wouter";
 import { MobileLayout } from "@/components/layout/MobileLayout";
 import { useBusinessId } from "@/lib/store";
 import { useUpload } from "@workspace/object-storage-web";
+import { useGetBusiness } from "@workspace/api-client-react";
+import { maxPostsForPlan, getPlan } from "@/lib/plans";
 import {
   Eye, Phone, MessageCircle, Star, TrendingUp,
   BarChart3, Loader2, ExternalLink,
   ChevronRight, CheckCircle2, Camera, Pencil, X, Save,
   MapPin, Clock, Globe, Instagram, BadgeCheck, Wrench,
   IndianRupee, Image as ImageIcon, Sparkles, User,
-  Plus, Trash2, ChevronLeft,
+  Plus, Trash2, ChevronLeft, Crown,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -123,6 +125,13 @@ export default function Analytics() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("profile");
+
+  const { data: business } = useGetBusiness(businessId!, {
+    query: { enabled: !!businessId, staleTime: 0, refetchOnMount: "always" },
+  });
+  const planId = (business as any)?.plan ?? "starter";
+  const planMaxPosts = maxPostsForPlan(planId);
+  const planInfo = getPlan(planId);
 
   const { data: profiles, isLoading: loadingProfiles } = useQuery<any[]>({
     queryKey: ["my-profile", businessId],
@@ -255,7 +264,13 @@ export default function Analytics() {
           images: postImages,
         }),
       });
-      if (!res.ok) throw new Error("Failed to create post");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({} as any));
+        if (body?.error === "POST_LIMIT_REACHED") {
+          throw new Error(body.message || "Post limit reach ho gayi. Upgrade karein.");
+        }
+        throw new Error(body?.message || body?.error || "Failed to create post");
+      }
       await queryClient.invalidateQueries({ queryKey: ["profile-posts", slug], refetchType: "all" });
       await queryClient.invalidateQueries({ queryKey: ["profile", slug], refetchType: "all" });
       setShowPostModal(false);
@@ -634,17 +649,44 @@ export default function Analytics() {
                 )}
 
                 {/* ── POSTS (carousel posts of work) ─────────────── */}
+                {(() => { const atLimit = posts.length >= planMaxPosts; return (
                 <div className="bg-card border border-border/50 rounded-2xl p-4">
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center justify-between mb-2">
                     <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
                       <ImageIcon className="w-3 h-3" /> Posts
-                      {posts.length > 0 && <span className="text-muted-foreground/70">({posts.length})</span>}
+                      <span className={`text-muted-foreground/70 ${atLimit ? "text-destructive" : ""}`}>
+                        ({posts.length}/{planMaxPosts})
+                      </span>
                     </p>
-                    <button onClick={() => { resetPostModal(); setShowPostModal(true); }}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white rounded-full text-[11px] font-bold shadow-sm active:scale-95 transition-all hover:shadow-md">
-                      <Plus className="w-3.5 h-3.5" /> New Post
+                    <button
+                      onClick={() => { if (atLimit) { setLocation("/app/upgrade"); return; } resetPostModal(); setShowPostModal(true); }}
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold shadow-sm active:scale-95 transition-all ${atLimit ? "bg-amber-500 text-white hover:bg-amber-600" : "bg-primary text-white hover:shadow-md"}`}>
+                      {atLimit ? <><Crown className="w-3.5 h-3.5" /> Upgrade</> : <><Plus className="w-3.5 h-3.5" /> New Post</>}
                     </button>
                   </div>
+
+                  {/* Plan usage strip */}
+                  <div className="mb-3 flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all ${atLimit ? "bg-destructive" : posts.length / planMaxPosts > 0.7 ? "bg-amber-500" : "bg-primary"}`}
+                        style={{ width: `${Math.min(100, (posts.length / planMaxPosts) * 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{planInfo.name}</span>
+                  </div>
+
+                  {atLimit && (
+                    <button
+                      onClick={() => setLocation("/app/upgrade")}
+                      className="w-full mb-3 flex items-center justify-between gap-2 px-3 py-2.5 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl text-left active:scale-[0.99] transition">
+                      <div className="flex items-center gap-2">
+                        <Crown className="w-4 h-4 text-amber-600" />
+                        <span className="text-[12px] font-semibold text-amber-900 dark:text-amber-200">Limit pohnch gayi — upgrade karke aur posts add karein</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-amber-600 shrink-0" />
+                    </button>
+                  )}
 
                   {posts.length === 0 ? (
                     <button onClick={() => { resetPostModal(); setShowPostModal(true); }}
@@ -685,6 +727,7 @@ export default function Analytics() {
                     </div>
                   )}
                 </div>
+                ); })()}
 
                 {/* Work gallery */}
                 {myProfile.workImages && myProfile.workImages.length > 0 && (
