@@ -8,6 +8,7 @@
 
 export * from "./addProfileReviewBody";
 export * from "./business";
+export * from "./businessPlan";
 export * from "./createBusinessBody";
 export * from "./createCustomerBody";
 export * from "./createProfileBody";
@@ -29,6 +30,7 @@ export * from "./reminderLog";
 export * from "./reviewLog";
 export * from "./serviceLog";
 export * from "./updateBusinessBody";
+export * from "./updateBusinessBodyPlan";
 export * from "./updateCustomerBody";
 export * from "./updateProfileBody";
 export * from "./updateServiceLogBody";

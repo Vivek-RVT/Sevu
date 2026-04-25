@@ -13,6 +13,14 @@ export interface ErrorResponse {
   error: string;
 }
 
+export type BusinessPlan = (typeof BusinessPlan)[keyof typeof BusinessPlan];
+
+export const BusinessPlan = {
+  starter: "starter",
+  growth: "growth",
+  pro: "pro",
+} as const;
+
 export interface Business {
   id: number;
   name: string;
@@ -22,6 +30,7 @@ export interface Business {
   reviewLink?: string;
   defaultReminderMessage?: string;
   defaultReviewMessage?: string;
+  plan?: BusinessPlan;
   createdAt?: string;
 }
 
@@ -32,6 +41,15 @@ export interface CreateBusinessBody {
   address?: string;
 }
 
+export type UpdateBusinessBodyPlan =
+  (typeof UpdateBusinessBodyPlan)[keyof typeof UpdateBusinessBodyPlan];
+
+export const UpdateBusinessBodyPlan = {
+  starter: "starter",
+  growth: "growth",
+  pro: "pro",
+} as const;
+
 export interface UpdateBusinessBody {
   name?: string;
   category?: string;
@@ -40,6 +58,7 @@ export interface UpdateBusinessBody {
   reviewLink?: string;
   defaultReminderMessage?: string;
   defaultReviewMessage?: string;
+  plan?: UpdateBusinessBodyPlan;
 }
 
 export interface Customer {

@@ -30,6 +30,7 @@ export const GetBusinessResponse = zod.object({
   reviewLink: zod.string().optional(),
   defaultReminderMessage: zod.string().optional(),
   defaultReviewMessage: zod.string().optional(),
+  plan: zod.enum(["starter", "growth", "pro"]).optional(),
   createdAt: zod.string().optional(),
 });
 
@@ -48,6 +49,7 @@ export const UpdateBusinessBody = zod.object({
   reviewLink: zod.string().optional(),
   defaultReminderMessage: zod.string().optional(),
   defaultReviewMessage: zod.string().optional(),
+  plan: zod.enum(["starter", "growth", "pro"]).optional(),
 });
 
 export const UpdateBusinessResponse = zod.object({
@@ -59,6 +61,7 @@ export const UpdateBusinessResponse = zod.object({
   reviewLink: zod.string().optional(),
   defaultReminderMessage: zod.string().optional(),
   defaultReviewMessage: zod.string().optional(),
+  plan: zod.enum(["starter", "growth", "pro"]).optional(),
   createdAt: zod.string().optional(),
 });
 

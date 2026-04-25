@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useLocation, Redirect } from "wouter";
 import { useListCustomers } from "@workspace/api-client-react";
-import { useBusinessId, usePendingCustomers } from "@/lib/store";
+import { useBusinessId } from "@/lib/store";
 import { haptic } from "@/lib/haptic";
 import { MobileLayout } from "@/components/layout/MobileLayout";
-import { Search, Plus, IndianRupee, CalendarDays, AlertCircle, Loader2, Info, X, Phone, Mail, MapPin, Cake, Wrench, StickyNote, Tag, Hash } from "lucide-react";
+import { Search, Plus, IndianRupee, CalendarDays, AlertCircle, Info, X, Phone, Mail, MapPin, Cake, Wrench, StickyNote, Tag, Hash } from "lucide-react";
 import { format, isBefore, addDays, differenceInDays } from "date-fns";
 import { useDebounce } from "@/lib/use-debounce";
 
@@ -63,26 +63,14 @@ export default function Customers() {
   const [search, setSearch] = useState("");
   const [activeTag, setActiveTag] = useState("All");
   const debouncedSearch = useDebounce(search, 300);
-  const pendingCustomers = usePendingCustomers();
   const [infoCustomer, setInfoCustomer] = useState<any | null>(null);
 
   if (!businessId) return <Redirect to="/app/login" />;
 
-  const { data: serverCustomers = [], isLoading } = useListCustomers(
+  const { data: customers = [], isLoading } = useListCustomers(
     { businessId, search: debouncedSearch || undefined },
     { query: { staleTime: 0, refetchOnMount: "always", refetchOnWindowFocus: true } },
   );
-
-  // Merge pending (optimistic) with server data — pending entries appear at top
-  // and are excluded from server list by phone to avoid duplication
-  const visiblePending = pendingCustomers.filter(p =>
-    p.businessId === businessId &&
-    (!debouncedSearch || p.name.toLowerCase().includes(debouncedSearch.toLowerCase()) || p.phone.includes(debouncedSearch))
-  );
-  const customers = [
-    ...visiblePending,
-    ...serverCustomers.filter(c => !visiblePending.some(p => p.phone === c.phone)),
-  ];
 
   const visibleCustomers = activeTag === "All"
     ? customers
@@ -246,27 +234,20 @@ export default function Customers() {
 
                       {/* Right side: status + info */}
                       <div className="flex-shrink-0 flex flex-col items-end gap-1.5">
-                        {customer.id < 0 ? (
-                          <div className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-muted text-muted-foreground">
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            Saving...
-                          </div>
-                        ) : (
-                          <>
-                            <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${STATUS_STYLES[status.color]}`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[status.color]}`} />
-                              {status.label}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); haptic("light"); setInfoCustomer(customer); }}
-                              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold text-primary bg-primary/10 hover:bg-primary/20 active:scale-95 transition"
-                              aria-label="View customer info"
-                            >
-                              <Info className="w-3 h-3" />
-                              Info
-                            </button>
-                          </>
+                        <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${STATUS_STYLES[status.color]}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[status.color]}`} />
+                          {status.label}
+                        </div>
+                        {customer.id > 0 && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); haptic("light"); setInfoCustomer(customer); }}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold text-primary bg-primary/10 hover:bg-primary/20 active:scale-95 transition"
+                            aria-label="View customer info"
+                          >
+                            <Info className="w-3 h-3" />
+                            Info
+                          </button>
                         )}
                       </div>
                     </div>

@@ -4,6 +4,9 @@ export interface PlanInfo {
   id: PlanId;
   name: string;
   priceRegular: number;
+  /**
+   * Launch / promotional price kept in data for future use, but not displayed in the UI right now.
+   */
   priceLaunch: number;
   maxPosts: number;
   popular?: boolean;

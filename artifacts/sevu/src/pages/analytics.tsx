@@ -571,83 +571,6 @@ export default function Analytics() {
                   </button>
                 )}
 
-                {/* Services */}
-                {services.length > 0 ? (
-                  <div className="bg-card border border-border/50 rounded-2xl p-4">
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
-                      <Wrench className="w-3 h-3" /> Services Offered
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {services.map((s, i) => (
-                        <span key={i} className="text-xs font-semibold bg-primary/10 text-primary px-3 py-1.5 rounded-full">
-                          {s}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <button onClick={() => setEditing(true)}
-                    className="w-full bg-card border border-dashed border-border rounded-2xl p-4 text-left hover:border-primary/40 transition">
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Services Offered</p>
-                    <p className="text-sm text-muted-foreground/70 italic mt-1">+ List the services you offer</p>
-                  </button>
-                )}
-
-                {/* Hours / Pricing */}
-                {(myProfile.openingHours || myProfile.priceRange) && (
-                  <div className="grid grid-cols-2 gap-3">
-                    {myProfile.openingHours && (
-                      <div className="bg-card border border-border/50 rounded-2xl p-3.5">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                          <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Hours</p>
-                        </div>
-                        <p className="text-sm font-semibold leading-tight">{myProfile.openingHours}</p>
-                      </div>
-                    )}
-                    {myProfile.priceRange && (
-                      <div className="bg-card border border-border/50 rounded-2xl p-3.5">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <IndianRupee className="w-3.5 h-3.5 text-muted-foreground" />
-                          <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Price Range</p>
-                        </div>
-                        <p className="text-sm font-semibold leading-tight">{myProfile.priceRange}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Contact */}
-                {(myProfile.whatsapp || myProfile.website || myProfile.instagram || myProfile.address) && (
-                  <div className="bg-card border border-border/50 rounded-2xl p-4 space-y-3">
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Contact</p>
-                    {myProfile.whatsapp && (
-                      <div className="flex items-center gap-2.5">
-                        <MessageCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
-                        <span className="text-sm font-medium">{myProfile.whatsapp}</span>
-                      </div>
-                    )}
-                    {myProfile.website && (
-                      <div className="flex items-center gap-2.5">
-                        <Globe className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                        <span className="text-sm font-medium truncate">{myProfile.website}</span>
-                      </div>
-                    )}
-                    {myProfile.instagram && (
-                      <div className="flex items-center gap-2.5">
-                        <Instagram className="w-4 h-4 text-pink-600 flex-shrink-0" />
-                        <span className="text-sm font-medium">@{myProfile.instagram.replace(/^@/, "")}</span>
-                      </div>
-                    )}
-                    {myProfile.address && (
-                      <div className="flex items-start gap-2.5">
-                        <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                        <span className="text-sm font-medium leading-snug">{myProfile.address}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 {/* ── POSTS (carousel posts of work) ─────────────── */}
                 {(() => { const atLimit = posts.length >= planMaxPosts; return (
                 <div className="bg-card border border-border/50 rounded-2xl p-4">
@@ -728,6 +651,83 @@ export default function Analytics() {
                   )}
                 </div>
                 ); })()}
+
+                {/* Services */}
+                {services.length > 0 ? (
+                  <div className="bg-card border border-border/50 rounded-2xl p-4">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
+                      <Wrench className="w-3 h-3" /> Services Offered
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {services.map((s, i) => (
+                        <span key={i} className="text-xs font-semibold bg-primary/10 text-primary px-3 py-1.5 rounded-full">
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setEditing(true)}
+                    className="w-full bg-card border border-dashed border-border rounded-2xl p-4 text-left hover:border-primary/40 transition">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Services Offered</p>
+                    <p className="text-sm text-muted-foreground/70 italic mt-1">+ List the services you offer</p>
+                  </button>
+                )}
+
+                {/* Hours / Pricing */}
+                {(myProfile.openingHours || myProfile.priceRange) && (
+                  <div className="grid grid-cols-2 gap-3">
+                    {myProfile.openingHours && (
+                      <div className="bg-card border border-border/50 rounded-2xl p-3.5">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Hours</p>
+                        </div>
+                        <p className="text-sm font-semibold leading-tight">{myProfile.openingHours}</p>
+                      </div>
+                    )}
+                    {myProfile.priceRange && (
+                      <div className="bg-card border border-border/50 rounded-2xl p-3.5">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <IndianRupee className="w-3.5 h-3.5 text-muted-foreground" />
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Price Range</p>
+                        </div>
+                        <p className="text-sm font-semibold leading-tight">{myProfile.priceRange}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Contact */}
+                {(myProfile.whatsapp || myProfile.website || myProfile.instagram || myProfile.address) && (
+                  <div className="bg-card border border-border/50 rounded-2xl p-4 space-y-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Contact</p>
+                    {myProfile.whatsapp && (
+                      <div className="flex items-center gap-2.5">
+                        <MessageCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                        <span className="text-sm font-medium">{myProfile.whatsapp}</span>
+                      </div>
+                    )}
+                    {myProfile.website && (
+                      <div className="flex items-center gap-2.5">
+                        <Globe className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                        <span className="text-sm font-medium truncate">{myProfile.website}</span>
+                      </div>
+                    )}
+                    {myProfile.instagram && (
+                      <div className="flex items-center gap-2.5">
+                        <Instagram className="w-4 h-4 text-pink-600 flex-shrink-0" />
+                        <span className="text-sm font-medium">@{myProfile.instagram.replace(/^@/, "")}</span>
+                      </div>
+                    )}
+                    {myProfile.address && (
+                      <div className="flex items-start gap-2.5">
+                        <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                        <span className="text-sm font-medium leading-snug">{myProfile.address}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Work gallery */}
                 {myProfile.workImages && myProfile.workImages.length > 0 && (

@@ -513,6 +513,9 @@ components:
           type: string
         defaultReviewMessage:
           type: string
+        plan:
+          type: string
+          enum: [starter, growth, pro]
         createdAt:
           type: string
       required: [id, name, category]
@@ -547,6 +550,9 @@ components:
           type: string
         defaultReviewMessage:
           type: string
+        plan:
+          type: string
+          enum: [starter, growth, pro]
 
     Customer:
       type: object

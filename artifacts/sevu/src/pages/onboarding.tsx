@@ -1348,9 +1348,10 @@ export default function Onboarding() {
                     : "Your Sevu account is ready. Start adding customers and sending reminders."}
                 </p>
               </div>
-              <button onClick={() => setLocation("/app/dashboard")}
-                className={primaryBtn}>
-                Go to Dashboard <ArrowRight className="w-5 h-5" />
+              <button onClick={() => setLocation("/app/choose-plan")}
+                className={primaryBtn}
+                data-testid="button-after-onboard-choose-plan">
+                Choose your plan <ArrowRight className="w-5 h-5" />
               </button>
             </motion.div>
           )}

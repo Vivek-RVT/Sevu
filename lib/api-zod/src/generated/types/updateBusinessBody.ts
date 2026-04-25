@@ -5,6 +5,7 @@
  * Sevu API - Customer management, WhatsApp reminder system, and public profiles
  * OpenAPI spec version: 0.2.0
  */
+import type { UpdateBusinessBodyPlan } from "./updateBusinessBodyPlan";
 
 export interface UpdateBusinessBody {
   name?: string;
@@ -14,4 +15,5 @@ export interface UpdateBusinessBody {
   reviewLink?: string;
   defaultReminderMessage?: string;
   defaultReviewMessage?: string;
+  plan?: UpdateBusinessBodyPlan;
 }

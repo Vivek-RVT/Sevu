@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useLocation, Redirect } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCreateCustomer, useListCustomers, getListCustomersQueryKey, type Customer } from "@workspace/api-client-react";
-import { useBusinessId, addPendingCustomer, removePendingCustomer } from "@/lib/store";
+import { useCreateCustomer, useListCustomers, type Customer } from "@workspace/api-client-react";
+import { useBusinessId } from "@/lib/store";
 import { haptic } from "@/lib/haptic";
 import {
   ArrowLeft, Loader2, UserPlus, ChevronDown,
@@ -98,28 +98,13 @@ export default function CustomerNew() {
       createdAt: new Date().toISOString(),
     } as any;
 
-    // Inject directly into the React Query cache so it appears instantly
-    const cacheKey = getListCustomersQueryKey({ businessId });
-    queryClient.setQueryData<Customer[]>(cacheKey, old => [optimistic, ...(old ?? [])]);
-
-    // Also add to pending store as a fallback when no cache exists yet
-    addPendingCustomer({
-      id: tempId,
-      businessId,
-      name: name.trim(),
-      phone: fullPhone.trim(),
-      email: email.trim() || null,
-      gender: gender || null,
-      address: address.trim() || null,
-      birthday: birthday || null,
-      serviceType: serviceType.trim() || null,
-      nextServiceDate: nextServiceDate || null,
-      notes: notes.trim() || null,
-      totalSpent: 0,
-      outstandingBalance: 0,
-      tags: null,
-      createdAt: new Date().toISOString(),
-    });
+    // Inject the optimistic customer into EVERY existing /api/customers cache slot
+    // (the customers page key includes a `search` param, so we patch all matching keys
+    // and also seed the no-search key so the list shows it instantly on navigate).
+    queryClient.setQueriesData<Customer[]>(
+      { queryKey: ["/api/customers"] },
+      old => [optimistic, ...(old ?? [])],
+    );
 
     haptic("success");
 
@@ -146,9 +131,7 @@ export default function CustomerNew() {
         { data: payload },
         {
           onSuccess: async (real) => {
-            // Inject real customer into EVERY listCustomers cache entry
-            // (the customers page key includes a `search` param so the
-            // exact key from customer-new doesn't match it — we patch all)
+            // Replace the temp entry in every customers cache slot with the real one
             queryClient.setQueriesData<Customer[]>(
               { queryKey: ["/api/customers"] },
               old => {
@@ -157,14 +140,10 @@ export default function CustomerNew() {
                 if (hasTemp) {
                   return old.map(c => c.id === tempId ? (real as Customer) : c);
                 }
-                // No temp in this cache slot — prepend the real customer
-                // unless it's already present (by phone)
                 if (old.some(c => c.phone === (real as Customer).phone)) return old;
                 return [real as Customer, ...old];
               },
             );
-            // Now safe to drop the pending entry: real one is in every cache
-            removePendingCustomer(tempId);
             queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
           },
           onError: () => {
@@ -172,7 +151,6 @@ export default function CustomerNew() {
               { queryKey: ["/api/customers"] },
               old => (old ?? []).filter(c => c.id !== tempId),
             );
-            removePendingCustomer(tempId);
           },
         }
       );
