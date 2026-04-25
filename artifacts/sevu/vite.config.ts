@@ -69,6 +69,18 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      "/sitemap.xml": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+        secure: false,
+        rewrite: (p) => p.replace(/^\/sitemap\.xml$/, "/api/sitemap.xml"),
+      },
+      "/robots.txt": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+        secure: false,
+        rewrite: (p) => p.replace(/^\/robots\.txt$/, "/api/robots.txt"),
+      },
     },
   },
   preview: {

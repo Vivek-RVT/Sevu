@@ -13,6 +13,8 @@ export const serviceLogsTable = pgTable("service_logs", {
   amount: real("amount"),
   paidAmount: real("paid_amount"),
   paymentStatus: text("payment_status").notNull().default("pending"),
+  completionStatus: text("completion_status").notNull().default("pending"),
+  completedAt: timestamp("completed_at"),
   serviceDate: timestamp("service_date").notNull(),
   paymentDate: timestamp("payment_date"),
   nextVisit: timestamp("next_visit"),
@@ -22,6 +24,7 @@ export const serviceLogsTable = pgTable("service_logs", {
   index("service_logs_business_id_idx").on(t.businessId),
   index("service_logs_customer_id_idx").on(t.customerId),
   index("service_logs_service_date_idx").on(t.serviceDate),
+  index("service_logs_completion_idx").on(t.businessId, t.completionStatus, t.completedAt),
 ]);
 
 export const insertServiceLogSchema = createInsertSchema(serviceLogsTable).omit({ id: true, createdAt: true });

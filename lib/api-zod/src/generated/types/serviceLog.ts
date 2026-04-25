@@ -5,6 +5,7 @@
  * Sevu API - Customer management, WhatsApp reminder system, and public profiles
  * OpenAPI spec version: 0.2.0
  */
+import type { ServiceLogCompletionStatus } from "./serviceLogCompletionStatus";
 
 export interface ServiceLog {
   id: number;
@@ -14,6 +15,8 @@ export interface ServiceLog {
   service: string;
   amount?: number;
   paymentStatus: string;
+  completionStatus?: ServiceLogCompletionStatus;
+  completedAt?: string | null;
   serviceDate: string;
   nextVisit?: string;
   note?: string;

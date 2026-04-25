@@ -7,10 +7,17 @@ import {
   ChevronLeft, ChevronRight, X, Phone, User,
   Globe, Instagram, ExternalLink, Sparkles, ArrowRight,
   CheckCircle2, DollarSign, ThumbsUp, ShieldCheck, Send, Users,
-  Navigation, Camera, Flame
+  Navigation, Camera, Share2, Copy, Check
 } from "lucide-react";
 import { format } from "date-fns";
 import { getWhatsAppLink } from "@/lib/whatsapp";
+import {
+  useSEO,
+  siteOrigin,
+  buildLocalBusinessSchema,
+  buildBreadcrumbSchema,
+  buildFAQSchema,
+} from "@/lib/seo";
 
 /* ── Reviewer stored locally ──────────────────────────────── */
 interface ReviewerInfo { name: string; phone?: string; age?: number; }
@@ -288,9 +295,6 @@ export default function ProfileDetail() {
   });
 
   useEffect(() => {
-    if (profile) {
-      document.title = `${profile.name} — ${profile.service} in ${profile.city}`;
-    }
     // track view
     if (slug) {
       fetch(`/api/profiles/${slug}/track`, {
@@ -299,7 +303,111 @@ export default function ProfileDetail() {
         body: JSON.stringify({ type: "view" }),
       }).catch(() => {});
     }
-  }, [profile, slug]);
+  }, [slug]);
+
+  /* ── SEO: rich title, meta, OG, JSON-LD LocalBusiness ── */
+  const seoData = profile
+    ? (() => {
+        const url = `${siteOrigin()}/profile/${profile.slug}`;
+        const ratingText =
+          profile.totalReviews > 0
+            ? `★ ${profile.rating.toFixed(1)} (${profile.totalReviews} reviews) · `
+            : "";
+        const title = `${profile.name} — ${profile.service} in ${profile.city} | Sevu`;
+        const description = profile.description
+          ? `${ratingText}${profile.description.slice(0, 150)}`
+          : `${ratingText}Book ${profile.name} for ${profile.service} services in ${profile.city}. Call or WhatsApp now.`;
+        const image =
+          profile.shopImage ||
+          profile.profileImage ||
+          (profile.workImages && profile.workImages[0]) ||
+          undefined;
+        const faqs = [
+          {
+            q: `Where is ${profile.name} located?`,
+            a: profile.address
+              ? `${profile.name} is located at ${profile.address}, ${profile.city}.`
+              : `${profile.name} provides ${profile.service} services in ${profile.city}.`,
+          },
+          {
+            q: `How can I contact ${profile.name}?`,
+            a: `You can call ${profile.name} on ${profile.phone}${
+              profile.whatsapp ? ` or WhatsApp on ${profile.whatsapp}` : ""
+            }, or message them directly through this page on Sevu.`,
+          },
+          ...(profile.priceRange
+            ? [
+                {
+                  q: `What are the charges of ${profile.name}?`,
+                  a: `${profile.name} typically charges ${profile.priceRange} for ${profile.service} services. Final price depends on the work.`,
+                },
+              ]
+            : []),
+          ...(profile.openingHours || profile.isAvailable24x7
+            ? [
+                {
+                  q: `What are the working hours?`,
+                  a: profile.isAvailable24x7
+                    ? `${profile.name} is available 24×7.`
+                    : `Working hours: ${profile.openingHours}`,
+                },
+              ]
+            : []),
+        ];
+        return {
+          title,
+          description,
+          image,
+          canonical: url,
+          type: "profile" as const,
+          keywords: [
+            `${profile.service} ${profile.city}`,
+            `${profile.service} near me`,
+            `best ${profile.service} in ${profile.city}`,
+            `${profile.name}`,
+            "Sevu",
+          ],
+          jsonLd: [
+            { id: "local-business", data: buildLocalBusinessSchema(profile, url) },
+            {
+              id: "breadcrumb",
+              data: buildBreadcrumbSchema([
+                { name: "Home", url: `${siteOrigin()}/` },
+                { name: "Services", url: `${siteOrigin()}/profile` },
+                {
+                  name: `${profile.service} in ${profile.city}`,
+                  url: `${siteOrigin()}/profile?service=${encodeURIComponent(profile.service)}&city=${encodeURIComponent(profile.city)}`,
+                },
+                { name: profile.name, url },
+              ]),
+            },
+            ...(faqs.length ? [{ id: "faq", data: buildFAQSchema(faqs) }] : []),
+          ],
+        };
+      })()
+    : null;
+  useSEO(seoData);
+
+  /* ── Share + copy phone ── */
+  const [copiedPhone, setCopiedPhone] = useState(false);
+  const handleShare = async () => {
+    if (!profile) return;
+    const url = `${siteOrigin()}/profile/${profile.slug}`;
+    const text = `Check out ${profile.name} — ${profile.service} in ${profile.city} on Sevu`;
+    if (navigator.share) {
+      try { await navigator.share({ title: profile.name, text, url }); return; }
+      catch { /* user cancelled */ }
+    }
+    try { await navigator.clipboard.writeText(url); alert("Link copied!"); } catch {}
+  };
+  const copyPhone = async () => {
+    if (!profile) return;
+    try {
+      await navigator.clipboard.writeText(profile.phone);
+      setCopiedPhone(true);
+      setTimeout(() => setCopiedPhone(false), 1800);
+    } catch {}
+  };
 
   const submitReview = useMutation({
     mutationFn: async (data: object) => {
@@ -376,15 +484,40 @@ export default function ProfileDetail() {
             </div>
           </div>
 
-          {/* CTA */}
-          <a href="/onboarding"
-            className="text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-full hover:bg-blue-100 transition-colors flex-shrink-0">
-            Join Free →
-          </a>
+          {/* Share + CTA */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button onClick={handleShare}
+              aria-label="Share profile"
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors text-gray-700">
+              <Share2 className="w-4 h-4" />
+            </button>
+            <a href="/onboarding"
+              className="hidden sm:inline-flex text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-full hover:bg-blue-100 transition-colors">
+              Join Free →
+            </a>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 pb-20 space-y-5 pt-5">
+      {/* Breadcrumbs (SEO + nav) */}
+      <nav aria-label="Breadcrumb" className="max-w-2xl mx-auto px-4 pt-3">
+        <ol className="flex items-center gap-1.5 text-xs text-gray-500 overflow-x-auto whitespace-nowrap">
+          <li><a href="/" className="hover:text-blue-600">Home</a></li>
+          <li className="text-gray-300">/</li>
+          <li><a href="/profile" className="hover:text-blue-600">Services</a></li>
+          <li className="text-gray-300">/</li>
+          <li>
+            <a href={`/profile?service=${encodeURIComponent(profile.service)}&city=${encodeURIComponent(profile.city)}`}
+              className="hover:text-blue-600">
+              {profile.service} in {profile.city}
+            </a>
+          </li>
+          <li className="text-gray-300">/</li>
+          <li className="text-gray-700 font-semibold truncate">{profile.name}</li>
+        </ol>
+      </nav>
+
+      <main className="max-w-2xl mx-auto px-4 pb-32 space-y-5 pt-3">
 
         {/* ── HERO ── */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 relative">
@@ -813,6 +946,33 @@ export default function ProfileDetail() {
         </div>
 
       </main>
+
+      {/* ── Sticky bottom CTA bar (mobile-first) ── */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      >
+        <div className="max-w-2xl mx-auto px-3 py-2.5 grid grid-cols-3 gap-2">
+          <a href={`tel:${profile.phone}`}
+            onClick={() => fetch(`/api/profiles/${slug}/track`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "call" }) }).catch(() => {})}
+            className="flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl bg-gray-100 active:scale-95 transition-transform">
+            <Phone className="w-5 h-5 text-gray-800" />
+            <span className="text-[11px] font-bold text-gray-800">Call</span>
+          </a>
+          <button onClick={copyPhone}
+            className="flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl bg-blue-50 border border-blue-100 active:scale-95 transition-transform">
+            {copiedPhone ? <Check className="w-5 h-5 text-green-600" /> : <Copy className="w-5 h-5 text-blue-600" />}
+            <span className="text-[11px] font-bold text-blue-700">{copiedPhone ? "Copied!" : "Copy No."}</span>
+          </button>
+          <a href={getWhatsAppLink(profile.whatsapp || profile.phone, whatsappMessage)}
+            target="_blank" rel="noopener noreferrer"
+            onClick={() => fetch(`/api/profiles/${slug}/track`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "whatsapp" }) }).catch(() => {})}
+            className="flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl bg-[#25D366] active:scale-95 transition-transform shadow-md shadow-green-500/30">
+            <MessageCircle className="w-5 h-5 text-white" />
+            <span className="text-[11px] font-bold text-white">WhatsApp</span>
+          </a>
+        </div>
+      </div>
 
       {/* Identity modal */}
       {showIdentityModal && (

@@ -3,6 +3,7 @@ import { useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Search, MapPin, Star, ChevronRight, Loader2, Wrench, Zap, Scissors, ThermometerSnowflake, UserCircle2, LogIn, X, ShieldCheck, IndianRupee, SlidersHorizontal, Sparkles, Hammer, Droplets, Plus, FlaskConical } from "lucide-react";
 import { MobileLayout } from "@/components/layout/MobileLayout";
+import { useSEO, siteOrigin } from "@/lib/seo";
 
 interface ReviewerUser { name: string; phone?: string; }
 function getReviewer(): ReviewerUser | null {
@@ -32,6 +33,47 @@ export default function ProfileDirectory() {
   const [loginPhone, setLoginPhone] = useState("");
 
   useEffect(() => { setService(activeService); setCity(activeCity); setMinRating(activeMinRating); }, [activeService, activeCity, activeMinRating]);
+
+  /* ── SEO ── */
+  const seoTitle = activeService && activeCity
+    ? `Best ${activeService} in ${activeCity} — Top Verified Service Providers | Sevu`
+    : activeService
+      ? `${activeService} Near You — Verified Local Pros | Sevu`
+      : activeCity
+        ? `Top Local Services in ${activeCity} | Sevu`
+        : "Find Local Services Near You — Plumber, Electrician, Salon & more | Sevu";
+  const seoDesc = activeService && activeCity
+    ? `Find the best ${activeService} in ${activeCity} on Sevu. Real reviews, instant call & WhatsApp. 100% verified providers.`
+    : activeService
+      ? `Top-rated ${activeService} near you. Verified profiles, real reviews, instant booking via call or WhatsApp.`
+      : "Discover trusted local service providers near you — plumbers, electricians, salons, AC repair and more. Verified, reviewed, and ready to help.";
+  useSEO({
+    title: seoTitle,
+    description: seoDesc,
+    canonical: `${siteOrigin()}/profile${searchString ? `?${searchString}` : ""}`,
+    keywords: [
+      `${activeService || "services"} near me`,
+      `${activeService || "services"}${activeCity ? ` in ${activeCity}` : ""}`,
+      "local business India",
+      "Sevu",
+    ],
+    jsonLd: [
+      {
+        id: "directory-breadcrumb",
+        data: {
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: "Home", item: `${siteOrigin()}/` },
+            { "@type": "ListItem", position: 2, name: "Services", item: `${siteOrigin()}/profile` },
+            ...(activeService
+              ? [{ "@type": "ListItem", position: 3, name: activeService, item: `${siteOrigin()}/profile?service=${encodeURIComponent(activeService)}` }]
+              : []),
+          ],
+        },
+      },
+    ],
+  });
 
   const { data: profiles, isLoading } = useQuery({
     queryKey: ["profiles", activeService, activeCity, activeMinRating],

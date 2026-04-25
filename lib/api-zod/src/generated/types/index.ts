@@ -29,6 +29,7 @@ export * from "./publicProfileWithReviews";
 export * from "./reminderLog";
 export * from "./reviewLog";
 export * from "./serviceLog";
+export * from "./serviceLogCompletionStatus";
 export * from "./updateBusinessBody";
 export * from "./updateBusinessBodyPlan";
 export * from "./updateCustomerBody";

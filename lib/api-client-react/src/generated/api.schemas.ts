@@ -260,6 +260,14 @@ export interface UpdateProfileBody {
   whatsapp?: string;
 }
 
+export type ServiceLogCompletionStatus =
+  (typeof ServiceLogCompletionStatus)[keyof typeof ServiceLogCompletionStatus];
+
+export const ServiceLogCompletionStatus = {
+  pending: "pending",
+  completed: "completed",
+} as const;
+
 export interface ServiceLog {
   id: number;
   businessId: number;
@@ -268,6 +276,8 @@ export interface ServiceLog {
   service: string;
   amount?: number;
   paymentStatus: string;
+  completionStatus?: ServiceLogCompletionStatus;
+  completedAt?: string | null;
   serviceDate: string;
   nextVisit?: string;
   note?: string;

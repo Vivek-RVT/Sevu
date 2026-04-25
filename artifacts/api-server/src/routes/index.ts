@@ -9,6 +9,7 @@ import profilesRouter from "./profiles";
 import serviceLogsRouter from "./service-logs";
 import authRouter from "./auth";
 import storageRouter from "./storage";
+import seoRouter from "./seo";
 
 const router: IRouter = Router();
 
@@ -16,6 +17,7 @@ const router: IRouter = Router();
 router.use(healthRouter);
 router.use("/auth", authRouter);
 router.use("/profiles", profilesRouter);
+router.use(seoRouter);
 
 // Protected routes — require valid JWT for all sub-routes
 router.use("/businesses", requireAuth, businessesRouter);

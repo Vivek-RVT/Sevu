@@ -36,8 +36,25 @@ export default function Services() {
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [completingId, setCompletingId] = useState<number | null>(null);
+  const [markingCompleteId, setMarkingCompleteId] = useState<number | null>(null);
+  const [undoingId, setUndoingId] = useState<number | null>(null);
+  const [completionError, setCompletionError] = useState<{ logId: number; message: string } | null>(null);
+  const [tick, setTick] = useState(0);
   const [selectedLog, setSelectedLog] = useState<ServiceLog | null>(null);
   const [workDoneLog, setWorkDoneLog] = useState<ServiceLog | null>(null);
+
+  // Drive 1-Hz refresh so the 10-minute undo countdown timer ticks down live.
+  useEffect(() => {
+    const t = setInterval(() => setTick(n => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Auto-clear inline completion error after 4 seconds
+  useEffect(() => {
+    if (!completionError) return;
+    const t = setTimeout(() => setCompletionError(null), 4000);
+    return () => clearTimeout(t);
+  }, [completionError]);
   const [workDonePayStatus, setWorkDonePayStatus] = useState<PayStatus>("paid");
   const [workDonePaidAmount, setWorkDonePaidAmount] = useState("");
   const [workDoneDueDate, setWorkDoneDueDate] = useState("");
@@ -206,6 +223,92 @@ export default function Services() {
       queryClient.invalidateQueries({
         predicate: q => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/customers/"),
       });
+    },
+  });
+
+  // ── Mark Complete (separate from payment) ──────────────────────────────────
+  const markComplete = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/service-logs/${id}/complete`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw { message: body?.message || body?.error || "Complete mark nahi ho saka." };
+      }
+      return body as { log: ServiceLog & { completionStatus: string; completedAt: string } };
+    },
+    onMutate: async (id: number) => {
+      haptic("success");
+      setMarkingCompleteId(id);
+      setCompletionError(null);
+      await queryClient.cancelQueries({ queryKey: logsQueryKey });
+      const prev = queryClient.getQueryData<ServiceLog[]>(logsQueryKey);
+      const nowIso = new Date().toISOString();
+      queryClient.setQueryData<ServiceLog[]>(logsQueryKey, old =>
+        (old ?? []).map(l => l.id === id ? { ...l, completionStatus: "completed", completedAt: nowIso } as ServiceLog : l)
+      );
+      return { prev };
+    },
+    onSuccess: (data) => {
+      // Replace optimistic record with authoritative server copy (includes serverTime)
+      queryClient.setQueryData<ServiceLog[]>(logsQueryKey, old =>
+        (old ?? []).map(l => l.id === data.log.id ? (data.log as ServiceLog) : l)
+      );
+    },
+    onError: (err: any, id: number, ctx: any) => {
+      if (ctx?.prev) queryClient.setQueryData(logsQueryKey, ctx.prev);
+      setCompletionError({ logId: id, message: err?.message || "Complete mark nahi ho saka." });
+    },
+    onSettled: () => {
+      setMarkingCompleteId(null);
+      queryClient.invalidateQueries({ queryKey: logsQueryKey });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/profiles"] });
+    },
+  });
+
+  const undoComplete = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/service-logs/${id}/undo-complete`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw { message: body?.message || body?.error || "Undo nahi ho saka." };
+      }
+      return body as { log: ServiceLog };
+    },
+    onMutate: async (id: number) => {
+      haptic("light");
+      setUndoingId(id);
+      await queryClient.cancelQueries({ queryKey: logsQueryKey });
+      const prev = queryClient.getQueryData<ServiceLog[]>(logsQueryKey);
+      queryClient.setQueryData<ServiceLog[]>(logsQueryKey, old =>
+        (old ?? []).map(l => l.id === id ? { ...l, completionStatus: "pending", completedAt: null as any } as ServiceLog : l)
+      );
+      return { prev };
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData<ServiceLog[]>(logsQueryKey, old =>
+        (old ?? []).map(l => l.id === data.log.id ? (data.log as ServiceLog) : l)
+      );
+    },
+    onError: (err: any, id: number, ctx: any) => {
+      if (ctx?.prev) queryClient.setQueryData(logsQueryKey, ctx.prev);
+      setCompletionError({ logId: id, message: err?.message || "Undo nahi ho saka." });
+    },
+    onSettled: () => {
+      setUndoingId(null);
+      queryClient.invalidateQueries({ queryKey: logsQueryKey });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/profiles"] });
     },
   });
 
@@ -510,6 +613,18 @@ export default function Services() {
                       </div>
                     </div>
 
+                    {/* Inline error banner — shown only for the row that errored */}
+                    {completionError && completionError.logId === log.id && (
+                      <div className="px-4 pb-2">
+                        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200/60 dark:border-amber-700/40 rounded-xl px-3 py-2 flex items-start gap-2">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                          <p className="text-xs font-semibold text-amber-700 dark:text-amber-300 leading-snug">
+                            {completionError.message}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="border-t border-border/40 flex">
                       {isTodo ? (
                         <button
@@ -520,34 +635,83 @@ export default function Services() {
                             ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             : <><Hammer className="w-3.5 h-3.5" /> Kaam Ho Gaya!</>}
                         </button>
-                      ) : (
-                        <button
-                          onClick={() => togglePayment.mutate({ id: log.id, currentStatus: log.paymentStatus })}
-                          disabled={togglingId === log.id}
-                          className={`flex-1 py-2.5 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${
-                            isPaid
-                              ? "text-green-600 hover:bg-green-50 dark:hover:bg-green-900/10"
-                              : isPartial
-                                ? "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/10"
-                                : "text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/10"
-                          }`}>
-                          {togglingId === log.id
+                      ) : (() => {
+                        // Mark Complete button — separate from Mark Paid.
+                        // Three visual states based on completionStatus + 10-min undo window.
+                        void tick; // re-render with each timer tick
+                        const completionStatus = (log as any).completionStatus as string | undefined;
+                        const completedAt = (log as any).completedAt as string | null | undefined;
+                        const isCompleted = completionStatus === "completed";
+                        const completedMs = completedAt ? new Date(completedAt).getTime() : 0;
+                        const undoMsLeft = isCompleted && completedMs
+                          ? Math.max(0, 10 * 60_000 - (Date.now() - completedMs))
+                          : 0;
+                        const canUndo = isCompleted && undoMsLeft > 0;
+                        const inFlight = markingCompleteId === log.id || undoingId === log.id;
+
+                        let label: React.ReactNode;
+                        let color: string;
+                        let onClick: () => void;
+                        let disabled = inFlight;
+
+                        if (canUndo) {
+                          const mins = Math.floor(undoMsLeft / 60_000);
+                          const secs = Math.floor((undoMsLeft % 60_000) / 1000);
+                          label = inFlight
                             ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            : isPaid ? "Mark Pending" : "Mark Paid ✓"}
-                        </button>
-                      )}
+                            : <>↶ Undo ({mins}:{secs.toString().padStart(2, "0")})</>;
+                          color = "text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/10";
+                          onClick = () => undoComplete.mutate(log.id);
+                        } else if (isCompleted) {
+                          label = <><CheckCircle2 className="w-3.5 h-3.5" /> Completed</>;
+                          color = "text-muted-foreground/60 cursor-not-allowed";
+                          onClick = () => {};
+                          disabled = true;
+                        } else {
+                          label = inFlight
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <><CheckCircle2 className="w-3.5 h-3.5" /> Mark Complete</>;
+                          color = "text-green-600 hover:bg-green-50 dark:hover:bg-green-900/10";
+                          onClick = () => markComplete.mutate(log.id);
+                        }
+
+                        return (
+                          <>
+                            <button
+                              onClick={onClick}
+                              disabled={disabled}
+                              className={`flex-1 py-2.5 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${color}`}>
+                              {label}
+                            </button>
+                            <div className="w-px bg-border/40" />
+                            <button
+                              onClick={() => togglePayment.mutate({ id: log.id, currentStatus: log.paymentStatus })}
+                              disabled={togglingId === log.id}
+                              className={`flex-1 py-2.5 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${
+                                isPaid
+                                  ? "text-green-600 hover:bg-green-50 dark:hover:bg-green-900/10"
+                                  : isPartial
+                                    ? "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/10"
+                                    : "text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/10"
+                              }`}>
+                              {togglingId === log.id
+                                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                : isPaid ? "Mark Pending" : "Mark Paid ₹"}
+                            </button>
+                          </>
+                        );
+                      })()}
                       <div className="w-px bg-border/40" />
                       <button
                         onClick={() => { haptic("light"); setSelectedLog(log); }}
-                        className="px-4 py-2.5 text-primary hover:bg-primary/5 transition-colors flex items-center gap-1 text-xs font-bold">
+                        className="px-3 py-2.5 text-primary hover:bg-primary/5 transition-colors flex items-center gap-1 text-xs font-bold">
                         <Eye className="w-3.5 h-3.5" />
-                        View
                       </button>
                       <div className="w-px bg-border/40" />
                       <button
                         onClick={() => { if (deletingId !== log.id) deleteLog.mutate(log.id); }}
                         disabled={deletingId === log.id}
-                        className="px-4 py-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-40">
+                        className="px-3 py-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-40">
                         {deletingId === log.id
                           ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                           : <Trash2 className="w-3.5 h-3.5" />}

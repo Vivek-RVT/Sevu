@@ -966,6 +966,12 @@ components:
           type: number
         paymentStatus:
           type: string
+        completionStatus:
+          type: string
+          enum: [pending, completed]
+        completedAt:
+          type: string
+          nullable: true
         serviceDate:
           type: string
         nextVisit:
