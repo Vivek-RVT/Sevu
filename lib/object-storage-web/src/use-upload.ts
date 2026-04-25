@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import type { UppyFile } from "@uppy/core";
+import { compressImage, isCompressibleImage, type CompressImageOptions } from "./compress-image";
 
 interface UploadMetadata {
   name: string;
@@ -16,6 +17,12 @@ interface UploadResponse {
 interface UseUploadOptions {
   /** Base path where object storage routes are mounted (default: "/api/storage") */
   basePath?: string;
+  /**
+   * Auto-compress image files in the browser before uploading.
+   * Set to `false` to skip, or pass options to tune compression.
+   * Default: `true` (uses sensible defaults for photo-quality JPEG).
+   */
+  compress?: boolean | CompressImageOptions;
   onSuccess?: (response: UploadResponse) => void;
   onError?: (error: Error) => void;
 }
@@ -55,9 +62,24 @@ interface UseUploadOptions {
  */
 export function useUpload(options: UseUploadOptions = {}) {
   const basePath = options.basePath ?? "/api/storage";
+  const compressOpt = options.compress ?? true;
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [progress, setProgress] = useState(0);
+
+  const maybeCompress = useCallback(
+    async (file: File): Promise<File> => {
+      if (compressOpt === false) return file;
+      if (!isCompressibleImage(file)) return file;
+      const opts = compressOpt === true ? undefined : compressOpt;
+      try {
+        return await compressImage(file, opts);
+      } catch {
+        return file;
+      }
+    },
+    [compressOpt],
+  );
 
   const requestUploadUrl = useCallback(
     async (file: File): Promise<UploadResponse> => {
@@ -107,11 +129,14 @@ export function useUpload(options: UseUploadOptions = {}) {
       setProgress(0);
 
       try {
-        setProgress(10);
-        const uploadResponse = await requestUploadUrl(file);
+        setProgress(5);
+        const prepared = await maybeCompress(file);
 
-        setProgress(30);
-        await uploadToPresignedUrl(file, uploadResponse.uploadURL);
+        setProgress(15);
+        const uploadResponse = await requestUploadUrl(prepared);
+
+        setProgress(35);
+        await uploadToPresignedUrl(prepared, uploadResponse.uploadURL);
 
         setProgress(100);
         options.onSuccess?.(uploadResponse);
@@ -125,7 +150,7 @@ export function useUpload(options: UseUploadOptions = {}) {
         setIsUploading(false);
       }
     },
-    [requestUploadUrl, uploadToPresignedUrl, options]
+    [maybeCompress, requestUploadUrl, uploadToPresignedUrl, options]
   );
 
   const getUploadParameters = useCallback(

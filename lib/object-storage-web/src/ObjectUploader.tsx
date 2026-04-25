@@ -6,10 +6,16 @@ import DashboardModal from "@uppy/react/dashboard-modal";
 import "@uppy/core/css/style.min.css";
 import "@uppy/dashboard/css/style.min.css";
 import AwsS3 from "@uppy/aws-s3";
+import { compressImage, isCompressibleImage, type CompressImageOptions } from "./compress-image";
 
 interface ObjectUploaderProps {
   maxNumberOfFiles?: number;
   maxFileSize?: number;
+  /**
+   * Auto-compress image files before upload. Set to `false` to skip,
+   * or pass options to tune compression. Defaults to `true`.
+   */
+  compress?: boolean | CompressImageOptions;
   /**
    * Function to get upload parameters for each file.
    * IMPORTANT: This receives the file object - use file.name, file.size, file.type
@@ -61,6 +67,7 @@ interface ObjectUploaderProps {
 export function ObjectUploader({
   maxNumberOfFiles = 1,
   maxFileSize = 10485760, // 10MB default
+  compress = true,
   onGetUploadParameters,
   onComplete,
   buttonClassName,
@@ -68,12 +75,14 @@ export function ObjectUploader({
 }: ObjectUploaderProps) {
   const onCompleteRef = useRef(onComplete);
   const onGetUploadParametersRef = useRef(onGetUploadParameters);
+  const compressRef = useRef(compress);
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
   useEffect(() => { onGetUploadParametersRef.current = onGetUploadParameters; }, [onGetUploadParameters]);
+  useEffect(() => { compressRef.current = compress; }, [compress]);
 
   const [showModal, setShowModal] = useState(false);
-  const [uppy] = useState(() =>
-    new Uppy({
+  const [uppy] = useState(() => {
+    const instance = new Uppy({
       restrictions: {
         maxNumberOfFiles,
         maxFileSize,
@@ -86,8 +95,46 @@ export function ObjectUploader({
       })
       .on("complete", (result) => {
         onCompleteRef.current?.(result);
-      })
-  );
+      });
+
+    // Compress image files in-place before they are uploaded.
+    instance.addPreProcessor(async (fileIDs) => {
+      const opt = compressRef.current;
+      if (opt === false) return;
+      const options = opt === true ? undefined : opt;
+
+      await Promise.all(
+        fileIDs.map(async (id) => {
+          const uppyFile = instance.getFile(id);
+          const data = uppyFile?.data as File | Blob | undefined;
+          if (!data || !isCompressibleImage(data)) return;
+
+          const original =
+            data instanceof File
+              ? data
+              : new File([data], uppyFile.name || "image", {
+                  type: data.type || "image/jpeg",
+                });
+
+          try {
+            const compressed = await compressImage(original, options);
+            if (compressed === original) return;
+            instance.setFileState(id, {
+              data: compressed,
+              size: compressed.size,
+              type: compressed.type,
+              name: compressed.name,
+              extension: compressed.name.split(".").pop() || uppyFile.extension,
+            });
+          } catch {
+            /* leave file untouched on failure */
+          }
+        }),
+      );
+    });
+
+    return instance;
+  });
 
   return (
     <div>
