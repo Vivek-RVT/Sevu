@@ -53,9 +53,15 @@ app.use(
 
 // ── CORS ────────────────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS: (string | RegExp)[] = [
-  /\.replit\.dev$/,
-  /\.replit\.app$/,
-  /\.pike\.replit\.dev$/,
+  /^https?:\/\/[^/]+\.replit\.dev(:\d+)?$/,
+  /^https?:\/\/[^/]+\.replit\.app(:\d+)?$/,
+  /^https?:\/\/[^/]+\.pike\.replit\.dev(:\d+)?$/,
+  /^https?:\/\/[^/]+\.kirk\.replit\.dev(:\d+)?$/,
+  /^https?:\/\/[^/]+\.spock\.replit\.dev(:\d+)?$/,
+  /^https?:\/\/[^/]+\.picard\.replit\.dev(:\d+)?$/,
+  /^https?:\/\/[^/]+\.janeway\.replit\.dev(:\d+)?$/,
+  /^https?:\/\/[^/]+\.sisko\.replit\.dev(:\d+)?$/,
+  /^https?:\/\/[^/]+\.worf\.replit\.dev(:\d+)?$/,
   /^https?:\/\/localhost(:\d+)?$/,
   /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
 ];
