@@ -18,6 +18,7 @@ import {
 import { getWhatsAppLink } from "@/lib/whatsapp";
 import { format, isBefore, differenceInDays } from "date-fns";
 import { CustomerDetailSkeleton } from "@/components/skeletons";
+import { DatePicker } from "@/components/date-picker";
 
 interface ServiceLog {
   id: number;
@@ -240,7 +241,7 @@ export default function CustomerDetail() {
               ))}
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold ml-1">Birthday</label>
-                <input type="date" className={inp} value={formData.birthday} onChange={e => set("birthday", e.target.value)} />
+                <DatePicker value={formData.birthday} onChange={v => set("birthday", v)} placeholder="Choose birthday" disableFuture />
               </div>
             </div>
 
@@ -254,15 +255,24 @@ export default function CustomerDetail() {
                   value={formData.serviceType} onChange={e => set("serviceType", e.target.value)} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: "Last Visit", key: "lastServiceDate" },
-                  { label: "Next Reminder", key: "nextServiceDate" },
-                ].map(f => (
-                  <div key={f.key} className="space-y-1.5">
-                    <label className="text-sm font-semibold ml-1">{f.label}</label>
-                    <input type="date" className={inp} value={(formData as any)[f.key]} onChange={e => set(f.key, e.target.value)} />
-                  </div>
-                ))}
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold ml-1">Last Visit</label>
+                  <DatePicker
+                    value={(formData as any).lastServiceDate}
+                    onChange={v => set("lastServiceDate", v)}
+                    placeholder="Pick last visit"
+                    disableFuture
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold ml-1">Next Reminder</label>
+                  <DatePicker
+                    value={(formData as any).nextServiceDate}
+                    onChange={v => set("nextServiceDate", v)}
+                    placeholder="Pick next visit"
+                    disablePast
+                  />
+                </div>
               </div>
             </div>
 

@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCreateCustomer, useListCustomers, type Customer } from "@workspace/api-client-react";
 import { useBusinessId } from "@/lib/store";
 import { haptic } from "@/lib/haptic";
+import { DatePicker } from "@/components/date-picker";
 import {
   ArrowLeft, Loader2, UserPlus, ChevronDown,
   StickyNote, MapPin, User, Users, Bell, Sparkles,
@@ -332,8 +333,7 @@ export default function CustomerNew() {
                   <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
                     <CalendarDays className="w-3 h-3" /> Birthday
                   </label>
-                  <input type="date" className={inp} value={birthday}
-                    onChange={e => setBirthday(e.target.value)} />
+                  <DatePicker value={birthday} onChange={setBirthday} placeholder="Choose birthday" disableFuture />
                 </div>
 
                 {/* Service Type */}
@@ -352,8 +352,7 @@ export default function CustomerNew() {
                   <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
                     <Bell className="w-3 h-3" /> Next Reminder Date
                   </label>
-                  <input type="date" className={inp} value={nextServiceDate}
-                    onChange={e => setNextServiceDate(e.target.value)} />
+                  <DatePicker value={nextServiceDate} onChange={setNextServiceDate} placeholder="Pick reminder date" disablePast />
                 </div>
 
                 {/* Notes */}
