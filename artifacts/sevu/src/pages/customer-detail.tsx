@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { getWhatsAppLink } from "@/lib/whatsapp";
 import { format, isBefore, differenceInDays } from "date-fns";
+import { CustomerDetailSkeleton } from "@/components/skeletons";
 
 interface ServiceLog {
   id: number;
@@ -112,8 +113,8 @@ export default function CustomerDetail() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-10 h-10 animate-spin text-primary" />
+      <div className="min-h-screen bg-background flex flex-col max-w-md mx-auto">
+        <CustomerDetailSkeleton />
       </div>
     );
   }

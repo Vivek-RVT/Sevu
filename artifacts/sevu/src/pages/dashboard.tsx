@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { getPlan } from "@/lib/plans";
 import { MobileLayout } from "@/components/layout/MobileLayout";
+import { DashboardSkeleton } from "@/components/skeletons";
 import { haptic } from "@/lib/haptic";
 
 const planBadge: Record<string, { Icon: any; label: string; bg: string }> = {
@@ -151,9 +152,7 @@ export default function Dashboard() {
   if (isDashLoading || isBizLoading) {
     return (
       <MobileLayout>
-        <div className="flex h-full min-h-[60vh] items-center justify-center">
-          <Loader2 className="w-10 h-10 animate-spin text-primary/50" />
-        </div>
+        <DashboardSkeleton />
       </MobileLayout>
     );
   }

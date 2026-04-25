@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, Redirect } from "wouter";
 import { MobileLayout } from "@/components/layout/MobileLayout";
+import { ServicesSkeleton } from "@/components/skeletons";
 import { useBusinessId } from "@/lib/store";
 import {
   useListCustomers,
@@ -499,9 +500,7 @@ export default function Services() {
         {/* ── LOG LIST ── */}
         <div className="flex-1 px-4 pt-3 pb-28">
           {isLoading ? (
-            <div className="flex justify-center py-16">
-              <Loader2 className="w-8 h-8 animate-spin text-primary/40" />
-            </div>
+            <ServicesSkeleton rows={5} />
 
           ) : logs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center px-6">

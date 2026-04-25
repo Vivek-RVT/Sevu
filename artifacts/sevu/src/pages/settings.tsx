@@ -9,6 +9,7 @@ import { useUpload } from "@workspace/object-storage-web";
 import { useBusinessId } from "@/lib/store";
 import { useAuth } from "@/contexts/AuthContext";
 import { MobileLayout } from "@/components/layout/MobileLayout";
+import { SettingsSkeleton } from "@/components/skeletons";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import {
   Loader2, Save, Store, MessageSquare, Star, LogOut,
@@ -835,9 +836,7 @@ export default function Settings() {
         </div>
 
         {isLoading ? (
-          <div className="flex justify-center py-16">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          </div>
+          <SettingsSkeleton />
         ) : (
           <div
             key={activeTab}

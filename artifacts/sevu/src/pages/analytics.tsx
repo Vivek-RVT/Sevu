@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, Redirect } from "wouter";
 import { MobileLayout } from "@/components/layout/MobileLayout";
+import { AnalyticsSkeleton } from "@/components/skeletons";
 import { useBusinessId } from "@/lib/store";
 import { useUpload } from "@workspace/object-storage-web";
 import { useGetBusiness } from "@workspace/api-client-react";
@@ -397,11 +398,7 @@ export default function Analytics() {
     <MobileLayout>
       <div className="flex flex-col min-h-screen pb-28">
 
-        {isLoading && (
-          <div className="flex-1 flex justify-center items-center py-32">
-            <Loader2 className="w-8 h-8 animate-spin text-primary/40" />
-          </div>
-        )}
+        {isLoading && <AnalyticsSkeleton />}
 
         {!isLoading && !myProfile && (
           <>

@@ -4,6 +4,7 @@ import { useListCustomers } from "@workspace/api-client-react";
 import { useBusinessId } from "@/lib/store";
 import { haptic } from "@/lib/haptic";
 import { MobileLayout } from "@/components/layout/MobileLayout";
+import { ListSkeleton } from "@/components/skeletons";
 import { Search, Plus, IndianRupee, CalendarDays, AlertCircle, Info, X, Phone, Mail, MapPin, Cake, Wrench, StickyNote, Tag, Hash } from "lucide-react";
 import { format, isBefore, addDays, differenceInDays } from "date-fns";
 import { useDebounce } from "@/lib/use-debounce";
@@ -136,9 +137,7 @@ export default function Customers() {
         {/* List */}
         <div className="flex-1 pb-24 mt-1">
           {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map(i => <div key={i} className="bg-card h-24 rounded-2xl animate-pulse border border-border/50" />)}
-            </div>
+            <ListSkeleton rows={6} />
           ) : visibleCustomers.length === 0 ? (
             <div className="text-center pt-16 px-4">
               <img src={`${import.meta.env.BASE_URL}images/empty-customers.png`} alt="No customers"
