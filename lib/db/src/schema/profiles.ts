@@ -66,3 +66,18 @@ export type Profile = typeof profilesTable.$inferSelect;
 export const insertProfileReviewSchema = createInsertSchema(profileReviewsTable).omit({ id: true, createdAt: true });
 export type InsertProfileReview = z.infer<typeof insertProfileReviewSchema>;
 export type ProfileReview = typeof profileReviewsTable.$inferSelect;
+
+export const profilePostsTable = pgTable("profile_posts", {
+  id: serial("id").primaryKey(),
+  profileId: integer("profile_id").references(() => profilesTable.id).notNull(),
+  caption: text("caption"),
+  images: text("images").array().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  index("profile_posts_profile_id_idx").on(t.profileId),
+  index("profile_posts_created_at_idx").on(t.createdAt),
+]);
+
+export const insertProfilePostSchema = createInsertSchema(profilePostsTable).omit({ id: true, createdAt: true });
+export type InsertProfilePost = z.infer<typeof insertProfilePostSchema>;
+export type ProfilePost = typeof profilePostsTable.$inferSelect;

@@ -10,6 +10,7 @@ import {
   ChevronRight, CheckCircle2, Camera, Pencil, X, Save,
   MapPin, Clock, Globe, Instagram, BadgeCheck, Wrench,
   IndianRupee, Image as ImageIcon, Sparkles, User,
+  Plus, Trash2, ChevronLeft,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -32,6 +33,14 @@ interface Analytics {
     comment?: string;
     createdAt: string;
   }[];
+}
+
+interface ProfilePost {
+  id: number;
+  profileId: number;
+  caption: string | null;
+  images: string[];
+  createdAt: string;
 }
 
 async function compressImage(file: File, maxPx = 1200, quality = 0.82): Promise<File> {
@@ -170,6 +179,107 @@ export default function Analytics() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const profileInput = useRef<HTMLInputElement>(null);
   const shopInput = useRef<HTMLInputElement>(null);
+
+  // ── Posts (carousel posts of work) ─────────────────────────────
+  const { data: posts = [] } = useQuery<ProfilePost[]>({
+    queryKey: ["profile-posts", slug],
+    queryFn: async () => {
+      const res = await fetch(`/api/profiles/${slug}/posts`);
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: !!slug,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+
+  const [showPostModal, setShowPostModal] = useState(false);
+  const [postCaption, setPostCaption] = useState("");
+  const [postImages, setPostImages] = useState<string[]>([]); // up to 2
+  const [postImgUploading, setPostImgUploading] = useState(false);
+  const [postSaving, setPostSaving] = useState(false);
+  const [deletingPostId, setDeletingPostId] = useState<number | null>(null);
+  const postImgInput = useRef<HTMLInputElement>(null);
+
+  const resetPostModal = () => {
+    setPostCaption("");
+    setPostImages([]);
+    setPostImgUploading(false);
+    setPostSaving(false);
+  };
+
+  const postImgUpload = useUpload({
+    onSuccess: async (res: any) => {
+      try {
+        const url = toPublicUrl(res.objectPath);
+        await saveImageRecord(res.objectPath, "post");
+        setPostImages(prev => prev.length >= 2 ? prev : [...prev, url]);
+      } catch (err: any) {
+        setUploadError(err?.message || "Image upload failed.");
+      } finally {
+        setPostImgUploading(false);
+      }
+    },
+    onError: (err: any) => {
+      setPostImgUploading(false);
+      setUploadError(err?.message || "Image upload failed. Try again.");
+    },
+  });
+
+  const handlePostImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (postImages.length >= 2) {
+      setUploadError("Sirf 2 photos allowed hain ek post mein.");
+      return;
+    }
+    setPostImgUploading(true);
+    const compressed = await compressImage(file, 1400, 0.85);
+    await postImgUpload.uploadFile(compressed);
+  };
+
+  const removePostImage = (idx: number) => {
+    setPostImages(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleCreatePost = async () => {
+    if (!slug || postImages.length === 0) return;
+    setPostSaving(true);
+    try {
+      const res = await fetch(`/api/profiles/${slug}/posts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          caption: postCaption.trim() || undefined,
+          images: postImages,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to create post");
+      await queryClient.invalidateQueries({ queryKey: ["profile-posts", slug], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["profile", slug], refetchType: "all" });
+      setShowPostModal(false);
+      resetPostModal();
+    } catch (err: any) {
+      setUploadError(err?.message || "Post create nahi ho saka. Try again.");
+      setPostSaving(false);
+    }
+  };
+
+  const handleDeletePost = async (id: number) => {
+    if (!slug) return;
+    setDeletingPostId(id);
+    try {
+      const res = await fetch(`/api/profiles/${slug}/posts/${id}`, { method: "DELETE" });
+      if (!res.ok && res.status !== 204) throw new Error("Failed to delete");
+      await queryClient.invalidateQueries({ queryKey: ["profile-posts", slug], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: ["profile", slug], refetchType: "all" });
+    } catch (err: any) {
+      setUploadError(err?.message || "Delete fail ho gaya.");
+    } finally {
+      setDeletingPostId(null);
+    }
+  };
 
   const patchProfile = async (fields: Record<string, unknown>) => {
     if (!slug) return;
@@ -523,6 +633,59 @@ export default function Analytics() {
                   </div>
                 )}
 
+                {/* ── POSTS (carousel posts of work) ─────────────── */}
+                <div className="bg-card border border-border/50 rounded-2xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                      <ImageIcon className="w-3 h-3" /> Posts
+                      {posts.length > 0 && <span className="text-muted-foreground/70">({posts.length})</span>}
+                    </p>
+                    <button onClick={() => { resetPostModal(); setShowPostModal(true); }}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white rounded-full text-[11px] font-bold shadow-sm active:scale-95 transition-all hover:shadow-md">
+                      <Plus className="w-3.5 h-3.5" /> New Post
+                    </button>
+                  </div>
+
+                  {posts.length === 0 ? (
+                    <button onClick={() => { resetPostModal(); setShowPostModal(true); }}
+                      className="w-full border border-dashed border-border rounded-xl py-6 px-4 text-center hover:border-primary/40 transition active:scale-[0.99]">
+                      <Plus className="w-6 h-6 text-muted-foreground/60 mx-auto mb-1.5" />
+                      <p className="text-xs font-semibold text-foreground">Add your first post</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">1 ya 2 photos + caption — customers ko apna kaam dikhao</p>
+                    </button>
+                  ) : (
+                    <div className="space-y-3">
+                      {posts.map(post => (
+                        <div key={post.id} className="border border-border/50 rounded-xl overflow-hidden bg-background">
+                          {/* Image carousel — 2-up grid if 2, else single */}
+                          <div className={`grid gap-1 ${post.images.length === 2 ? "grid-cols-2" : "grid-cols-1"}`}>
+                            {post.images.map((url, i) => (
+                              <div key={i} className="aspect-square bg-muted overflow-hidden">
+                                <img src={url} alt="" className="w-full h-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
+                          <div className="p-3">
+                            {post.caption && (
+                              <p className="text-sm text-foreground/90 leading-snug mb-2 whitespace-pre-line">{post.caption}</p>
+                            )}
+                            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                              <span>{format(new Date(post.createdAt), "d MMM, yyyy")}</span>
+                              <button onClick={() => handleDeletePost(post.id)}
+                                disabled={deletingPostId === post.id}
+                                className="flex items-center gap-1 text-destructive/80 hover:text-destructive font-semibold active:scale-95 transition disabled:opacity-50">
+                                {deletingPostId === post.id
+                                  ? <><Loader2 className="w-3 h-3 animate-spin" /> Deleting…</>
+                                  : <><Trash2 className="w-3 h-3" /> Delete</>}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {/* Work gallery */}
                 {myProfile.workImages && myProfile.workImages.length > 0 && (
                   <div className="bg-card border border-border/50 rounded-2xl p-4">
@@ -637,6 +800,97 @@ export default function Analytics() {
           </>
         )}
       </div>
+
+      {/* ── NEW POST MODAL ────────────────────────────────────── */}
+      {showPostModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-150"
+          onClick={() => !postSaving && setShowPostModal(false)}>
+          <div className="bg-card w-full sm:max-w-lg sm:rounded-3xl rounded-t-3xl shadow-2xl border border-border/50 max-h-[92vh] overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-border/50 flex items-center justify-between">
+              <div>
+                <h2 className="font-display font-bold text-lg">New Post</h2>
+                <p className="text-xs text-muted-foreground">1 ya 2 photos add karo (carousel)</p>
+              </div>
+              <button onClick={() => !postSaving && setShowPostModal(false)} disabled={postSaving}
+                className="w-9 h-9 rounded-full hover:bg-muted active:scale-95 flex items-center justify-center transition disabled:opacity-50">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+              {/* Image slots (carousel) */}
+              <div>
+                <label className="text-xs font-bold text-foreground mb-2 block">
+                  Photos ({postImages.length}/2)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[0, 1].map(i => {
+                    const url = postImages[i];
+                    if (url) {
+                      return (
+                        <div key={i} className="relative aspect-square rounded-xl overflow-hidden border border-border/50 bg-muted">
+                          <img src={url} alt="" className="w-full h-full object-cover" />
+                          <button type="button" onClick={() => removePostImage(i)}
+                            className="absolute top-1.5 right-1.5 w-7 h-7 bg-black/65 hover:bg-black/85 text-white rounded-full flex items-center justify-center active:scale-95 transition">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                          <div className="absolute bottom-1.5 left-1.5 bg-black/55 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            {i + 1}
+                          </div>
+                        </div>
+                      );
+                    }
+                    const isNextSlot = i === postImages.length;
+                    return (
+                      <button key={i} type="button"
+                        onClick={() => isNextSlot && !postImgUploading && postImgInput.current?.click()}
+                        disabled={!isNextSlot || postImgUploading}
+                        className={`aspect-square rounded-xl border-2 border-dashed flex flex-col items-center justify-center text-xs font-semibold transition active:scale-[0.98]
+                          ${isNextSlot
+                            ? "border-primary/40 text-primary hover:border-primary hover:bg-primary/5"
+                            : "border-border/40 text-muted-foreground/40"}`}>
+                        {postImgUploading && isNextSlot
+                          ? <Loader2 className="w-6 h-6 animate-spin" />
+                          : <><Camera className="w-6 h-6 mb-1.5 opacity-70" /> Add photo</>}
+                      </button>
+                    );
+                  })}
+                </div>
+                <input ref={postImgInput} type="file" accept="image/*" className="hidden" onChange={handlePostImage} />
+                <p className="text-[10px] text-muted-foreground mt-2">
+                  Pehli photo cover hogi. 2 photos = swipeable carousel post
+                </p>
+              </div>
+
+              {/* Caption */}
+              <div>
+                <label className="text-xs font-bold text-foreground mb-1.5 block">
+                  Caption <span className="font-normal text-muted-foreground">(optional)</span>
+                </label>
+                <textarea rows={3} className={inp}
+                  value={postCaption}
+                  onChange={e => setPostCaption(e.target.value.slice(0, 500))}
+                  placeholder="Apne kaam ke baare mein kuch likho..." />
+                <p className="text-[10px] text-muted-foreground mt-1 text-right">{postCaption.length}/500</p>
+              </div>
+            </div>
+
+            <div className="px-5 py-3 border-t border-border/50 flex gap-2">
+              <button onClick={() => setShowPostModal(false)} disabled={postSaving}
+                className="flex-1 py-3 rounded-xl font-bold text-sm bg-muted text-foreground hover:bg-muted/80 active:scale-[0.98] transition disabled:opacity-50">
+                Cancel
+              </button>
+              <button onClick={handleCreatePost} disabled={postSaving || postImages.length === 0 || postImgUploading}
+                className="flex-1 py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-primary to-secondary text-primary-foreground shadow-md hover:shadow-lg hover:shadow-primary/25 active:scale-[0.98] transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:hover:shadow-md">
+                {postSaving
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <><Plus className="w-4 h-4" /> Post karo</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── EDIT PROFILE MODAL ─────────────────────────────────── */}
       {editing && myProfile && (

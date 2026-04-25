@@ -88,6 +88,87 @@ function Gallery({ images }: { images: string[] }) {
   );
 }
 
+/* ── PostCard: a carousel post (1 or 2 images + caption) ── */
+function PostCard({ post }: { post: { id: number; caption: string | null; images: string[]; createdAt: string } }) {
+  const [idx, setIdx] = useState(0);
+  const [lb, setLb] = useState(false);
+  const total = post.images.length;
+  const safeIdx = Math.min(idx, total - 1);
+  const next = () => setIdx(i => (i + 1) % total);
+  const prev = () => setIdx(i => (i - 1 + total) % total);
+  return (
+    <div className="border border-gray-100 rounded-2xl overflow-hidden bg-white">
+      <div className="relative bg-gray-100 aspect-square">
+        <img
+          src={post.images[safeIdx]}
+          alt=""
+          onClick={() => setLb(true)}
+          className="w-full h-full object-cover cursor-zoom-in active:opacity-95 transition"
+          onError={e => { (e.target as HTMLImageElement).src = "https://placehold.co/400x400?text=Photo"; }}
+        />
+        {total > 1 && (
+          <>
+            <button onClick={prev}
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/45 hover:bg-black/65 backdrop-blur-sm text-white flex items-center justify-center active:scale-95 transition">
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <button onClick={next}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/45 hover:bg-black/65 backdrop-blur-sm text-white flex items-center justify-center active:scale-95 transition">
+              <ChevronRight className="w-5 h-5" />
+            </button>
+            <div className="absolute top-2 right-2 bg-black/55 text-white text-[11px] font-bold px-2 py-1 rounded-full">
+              {safeIdx + 1} / {total}
+            </div>
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+              {post.images.map((_, i) => (
+                <button key={i} onClick={() => setIdx(i)}
+                  className={`w-1.5 h-1.5 rounded-full transition-all ${i === safeIdx ? "bg-white w-4" : "bg-white/55"}`} />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+      {(post.caption || post.createdAt) && (
+        <div className="p-4">
+          {post.caption && (
+            <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-line mb-2">{post.caption}</p>
+          )}
+          <p className="text-[11px] text-gray-400 font-medium">
+            {format(new Date(post.createdAt), "d MMM, yyyy")}
+          </p>
+        </div>
+      )}
+
+      {/* Lightbox */}
+      {lb && (
+        <div className="fixed inset-0 bg-black/95 z-50 flex flex-col" onClick={() => setLb(false)}>
+          <div className="flex items-center justify-between p-4 flex-shrink-0">
+            <span className="text-white/60 text-sm font-medium">{safeIdx + 1} / {total}</span>
+            <button className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white" onClick={() => setLb(false)}>
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex-1 flex items-center justify-center px-4 pb-4 relative" onClick={e => e.stopPropagation()}>
+            <img src={post.images[safeIdx]} alt="" className="max-h-full max-w-full object-contain rounded-xl" />
+            {total > 1 && (
+              <>
+                <button onClick={e => { e.stopPropagation(); prev(); }}
+                  className="absolute left-2 w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white">
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <button onClick={e => { e.stopPropagation(); next(); }}
+                  className="absolute right-2 w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white">
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Star picker ─────────────────────────────────────────── */
 function StarPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const [hovered, setHovered] = useState(0);
@@ -194,6 +275,16 @@ export default function ProfileDetail() {
       if (!res.ok) throw new Error("Profile not found");
       return res.json();
     }
+  });
+
+  const { data: posts = [] } = useQuery<{ id: number; caption: string | null; images: string[]; createdAt: string }[]>({
+    queryKey: ["profile-posts-public", slug],
+    queryFn: async () => {
+      const res = await fetch(`/api/profiles/${slug}/posts`);
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: !!slug,
   });
 
   useEffect(() => {
@@ -414,6 +505,26 @@ export default function ProfileDetail() {
             </a>
           </div>
         </div>
+
+        {/* ── POSTS — carousel posts of work ── */}
+        {posts.length > 0 && (
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-9 h-9 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 flex-shrink-0">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 leading-tight">Posts</h2>
+                <p className="text-xs text-gray-400">Latest work updates</p>
+              </div>
+            </div>
+            <div className="space-y-4">
+              {posts.map(post => (
+                <PostCard key={post.id} post={post} />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ── RECENT WORK — moved high for social proof ── */}
         {workImages.length > 0 && (

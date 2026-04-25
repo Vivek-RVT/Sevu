@@ -46,6 +46,7 @@ artifacts-monorepo/
 - **Mark as Done**: Updates service dates, auto-calculates next service date
 - **Review Requests**: Send review requests via WhatsApp after marking done
 - **Settings**: Edit business info, custom reminder/review messages, review link
+- **Public Profile + Posts**: Each business can publish a public profile (`/profile/:slug`) with reviews, work gallery, and "Posts" — carousel posts with 1 or 2 photos + caption (table: `profile_posts`, routes: `GET/POST/DELETE /api/profiles/:slug/posts`)
 
 ## Auth System
 

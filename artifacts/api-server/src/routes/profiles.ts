@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
 import rateLimit from "express-rate-limit";
+import { z } from "zod";
 import { db } from "@workspace/db";
-import { profilesTable, profileReviewsTable } from "@workspace/db/schema";
+import { profilesTable, profileReviewsTable, profilePostsTable } from "@workspace/db/schema";
 import { eq, ilike, desc, and, count, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
@@ -298,6 +299,111 @@ router.post(
 
     await cacheDel(`profile:${slug}`);
     res.status(201).json({ ...review, createdAt: review.createdAt.toISOString() });
+  },
+);
+
+// ── Profile posts (carousel posts of work) ────────────────────────
+const CreateProfilePostBody = z.object({
+  caption: z.string().max(500).optional(),
+  images: z.array(z.string().min(1)).min(1).max(2),
+}).strict();
+type CreateProfilePostBodyType = z.infer<typeof CreateProfilePostBody>;
+
+const PostIdParam = z.object({
+  slug: z.string().min(1),
+  id: z.string().regex(/^\d+$/).transform(Number),
+});
+
+const formatPost = (p: typeof profilePostsTable.$inferSelect) => ({
+  ...p,
+  createdAt: p.createdAt.toISOString(),
+});
+
+// GET /profiles/:slug/posts — public list of posts
+router.get(
+  "/:slug/posts",
+  validate({ params: ProfileSlugParam }),
+  async (req, res) => {
+    const { slug } = req.validated.params as ProfileSlugParamType;
+    const [profile] = await db
+      .select({ id: profilesTable.id })
+      .from(profilesTable)
+      .where(eq(profilesTable.slug, slug));
+    if (!profile) { res.status(404).json({ error: "Profile not found" }); return; }
+
+    const posts = await db
+      .select()
+      .from(profilePostsTable)
+      .where(eq(profilePostsTable.profileId, profile.id))
+      .orderBy(desc(profilePostsTable.createdAt))
+      .limit(50);
+
+    res.json(posts.map(formatPost));
+  },
+);
+
+// POST /profiles/:slug/posts — create a post (auth + ownership)
+router.post(
+  "/:slug/posts",
+  requireAuth,
+  validate({ params: ProfileSlugParam, body: CreateProfilePostBody }),
+  async (req, res) => {
+    const { slug } = req.validated.params as ProfileSlugParamType;
+    const data = req.validated.body as CreateProfilePostBodyType;
+
+    const [profile] = await db
+      .select({ id: profilesTable.id, businessId: profilesTable.businessId })
+      .from(profilesTable)
+      .where(eq(profilesTable.slug, slug));
+    if (!profile) { res.status(404).json({ error: "Profile not found" }); return; }
+
+    if (profile.businessId !== req.auth!.businessId) {
+      res.status(403).json({ error: "Access denied. You do not own this profile." });
+      return;
+    }
+
+    const [post] = await db
+      .insert(profilePostsTable)
+      .values({
+        profileId: profile.id,
+        caption: data.caption ?? null,
+        images: data.images,
+      })
+      .returning();
+
+    await cacheDel(`profile:${slug}`);
+    res.status(201).json(formatPost(post));
+  },
+);
+
+// DELETE /profiles/:slug/posts/:id — delete a post (auth + ownership)
+router.delete(
+  "/:slug/posts/:id",
+  requireAuth,
+  validate({ params: PostIdParam }),
+  async (req, res) => {
+    const { slug, id } = req.validated.params as z.infer<typeof PostIdParam>;
+
+    const [profile] = await db
+      .select({ id: profilesTable.id, businessId: profilesTable.businessId })
+      .from(profilesTable)
+      .where(eq(profilesTable.slug, slug));
+    if (!profile) { res.status(404).json({ error: "Profile not found" }); return; }
+
+    if (profile.businessId !== req.auth!.businessId) {
+      res.status(403).json({ error: "Access denied. You do not own this profile." });
+      return;
+    }
+
+    await db
+      .delete(profilePostsTable)
+      .where(and(
+        eq(profilePostsTable.id, id),
+        eq(profilePostsTable.profileId, profile.id),
+      ));
+
+    await cacheDel(`profile:${slug}`);
+    res.status(204).send();
   },
 );
 
