@@ -139,8 +139,6 @@ function Router() {
   const [location] = useLocation();
   const { isAuthenticated, businessId, isLoading } = useAuth();
 
-  if (isLoading) return <PageLoader />;
-
   return (
     <>
     <ScrollToTop />
