@@ -70,11 +70,20 @@ export default function Dashboard() {
 
   if (!businessId) return <Redirect to="/app/login" />;
 
-  const { data: dashboard, isLoading: isDashLoading, refetch } = useGetDashboard({ businessId });
-  const { data: business, isLoading: isBizLoading } = useGetBusiness(businessId);
+  const { data: dashboard, isLoading: isDashLoading, refetch } = useGetDashboard(
+    { businessId },
+    { query: { staleTime: 0, refetchOnMount: "always", refetchOnWindowFocus: true } },
+  );
+  const { data: business, isLoading: isBizLoading } = useGetBusiness(
+    businessId,
+    { query: { staleTime: 0, refetchOnMount: "always", refetchOnWindowFocus: true } },
+  );
 
   const { data: serviceLogs = [] } = useQuery<ServiceLog[]>({
     queryKey: ["service-logs-dash", businessId],
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const res = await fetch(`/api/service-logs?businessId=${businessId}`);
       if (!res.ok) throw new Error("Failed");
@@ -84,6 +93,9 @@ export default function Dashboard() {
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["customers-dash", businessId],
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const res = await fetch(`/api/customers?businessId=${businessId}`);
       if (!res.ok) throw new Error("Failed");

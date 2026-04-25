@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useLocation, useParams, Redirect } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useGetCustomer,
   useUpdateCustomer,
   useDeleteCustomer,
+  getGetCustomerQueryKey,
 } from "@workspace/api-client-react";
 import { useBusinessId } from "@/lib/store";
 import {
@@ -46,13 +47,30 @@ export default function CustomerDetail() {
     );
   }
 
-  const { data: customer, isLoading } = useGetCustomer(customerId);
+  const queryClient = useQueryClient();
+
+  const { data: customer, isLoading } = useGetCustomer(
+    customerId,
+    { query: { staleTime: 0, refetchOnMount: "always", refetchOnWindowFocus: true } },
+  );
   const updateCustomer = useUpdateCustomer();
   const deleteCustomer = useDeleteCustomer();
+
+  const invalidateAfterCustomerChange = () => {
+    queryClient.invalidateQueries({ queryKey: getGetCustomerQueryKey(customerId), refetchType: "all" });
+    queryClient.invalidateQueries({ queryKey: ["/api/customers"], refetchType: "all" });
+    queryClient.invalidateQueries({ queryKey: ["/api/dashboard"], refetchType: "all" });
+    queryClient.invalidateQueries({ queryKey: ["customers-dash"], refetchType: "all" });
+    queryClient.invalidateQueries({ queryKey: ["service-logs-dash"], refetchType: "all" });
+    queryClient.invalidateQueries({ queryKey: ["service-logs-customer"], refetchType: "all" });
+  };
 
   const { data: serviceLogs = [] } = useQuery<ServiceLog[]>({
     queryKey: ["service-logs-customer", customerId, businessId],
     enabled: !!businessId && !!customerId && !isNaN(customerId) && customerId > 0,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const res = await fetch(`/api/service-logs?businessId=${businessId}&customerId=${customerId}`);
       if (!res.ok) throw new Error("Failed");
@@ -137,6 +155,7 @@ export default function CustomerDetail() {
           tags: formData.tags.length > 0 ? formData.tags.join(", ") : undefined,
         },
       });
+      invalidateAfterCustomerChange();
       setIsEditing(false);
     } catch (err) {
       console.error(err);
@@ -146,6 +165,7 @@ export default function CustomerDetail() {
   const handleDelete = async () => {
     try {
       await deleteCustomer.mutateAsync({ id: customerId });
+      invalidateAfterCustomerChange();
       setLocation("/app/customers");
     } catch (err) {
       console.error(err);

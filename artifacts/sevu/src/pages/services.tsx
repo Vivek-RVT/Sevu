@@ -127,16 +127,24 @@ export default function Services() {
           ? list
           : [(realLog as ServiceLog), ...list];
       });
-      // Refresh dashboard and customer stats (but NOT the logs list — it's already up to date)
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
-      queryClient.invalidateQueries({ queryKey: ["service-logs-dash"] });
-      queryClient.invalidateQueries({ queryKey: ["customers-dash"] });
-      queryClient.invalidateQueries({ queryKey: ["service-logs-customer"] });
-      queryClient.invalidateQueries({ predicate: q => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/customers/") });
     },
     onError: (_err, _vars, ctx) => {
       if (ctx?.prev !== undefined) queryClient.setQueryData(logsQueryKey, ctx.prev);
+    },
+    onSettled: () => {
+      // Always force a fresh fetch on EVERY related query (active + inactive),
+      // so re-opening Services / Dashboard / Customer detail shows the new item.
+      queryClient.invalidateQueries({ queryKey: logsQueryKey, refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-logs"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["service-logs-dash"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["customers-dash"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["service-logs-customer"], refetchType: "all" });
+      queryClient.invalidateQueries({
+        predicate: q => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/customers/"),
+        refetchType: "all",
+      });
     },
   });
 
@@ -155,12 +163,17 @@ export default function Services() {
     },
     onSettled: () => {
       setDeletingId(null);
-      queryClient.invalidateQueries({ queryKey: logsQueryKey });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["service-logs-dash"] });
-      queryClient.invalidateQueries({ queryKey: ["customers-dash"] });
-      queryClient.invalidateQueries({ queryKey: ["service-logs-customer"] });
-      queryClient.invalidateQueries({ predicate: q => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/customers/") });
+      queryClient.invalidateQueries({ queryKey: logsQueryKey, refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-logs"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["service-logs-dash"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["customers-dash"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["service-logs-customer"], refetchType: "all" });
+      queryClient.invalidateQueries({
+        predicate: q => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/customers/"),
+        refetchType: "all",
+      });
     },
   });
 
@@ -185,13 +198,17 @@ export default function Services() {
     },
     onSettled: () => {
       setTogglingId(null);
-      queryClient.invalidateQueries({ queryKey: logsQueryKey });
-      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["service-logs-dash"] });
-      queryClient.invalidateQueries({ queryKey: ["customers-dash"] });
-      queryClient.invalidateQueries({ queryKey: ["service-logs-customer"] });
-      queryClient.invalidateQueries({ predicate: q => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/customers/") });
+      queryClient.invalidateQueries({ queryKey: logsQueryKey, refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-logs"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["service-logs-dash"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["customers-dash"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["service-logs-customer"], refetchType: "all" });
+      queryClient.invalidateQueries({
+        predicate: q => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/customers/"),
+        refetchType: "all",
+      });
     },
   });
 
@@ -223,13 +240,17 @@ export default function Services() {
       setWorkDonePayStatus("paid");
       setWorkDonePaidAmount("");
       setWorkDoneDueDate("");
-      queryClient.invalidateQueries({ queryKey: logsQueryKey });
-      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["service-logs-dash"] });
-      queryClient.invalidateQueries({ queryKey: ["customers-dash"] });
-      queryClient.invalidateQueries({ queryKey: ["service-logs-customer"] });
-      queryClient.invalidateQueries({ predicate: q => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/customers/") });
+      queryClient.invalidateQueries({ queryKey: logsQueryKey, refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-logs"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["service-logs-dash"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["customers-dash"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["service-logs-customer"], refetchType: "all" });
+      queryClient.invalidateQueries({
+        predicate: q => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/customers/"),
+        refetchType: "all",
+      });
     },
   });
 
