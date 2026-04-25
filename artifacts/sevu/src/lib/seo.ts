@@ -91,6 +91,9 @@ export function useSEO(opts: SeoOptions | null) {
 }
 
 export function siteOrigin(): string {
+  // Allow explicit override (production deployments / canonical domain)
+  const override = (import.meta as any).env?.VITE_BASE_URL as string | undefined;
+  if (override) return override.replace(/\/+$/, "");
   if (typeof window === "undefined") return "";
   return window.location.origin;
 }

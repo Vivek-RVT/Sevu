@@ -1,5 +1,16 @@
 uploads = []
-generated = []
+
+[[generated]]
+id = "jabWTNaCN3fyTgUIv0D8m"
+uri = "file://artifacts/sevu/public/seed/sharma-logo.png"
+type = "image"
+title = "sharma electricals logo"
+
+[[generated]]
+id = "P7l1WkiRYz1OPFJ62SRn1"
+uri = "file://artifacts/sevu/public/seed/sharma-banner.png"
+type = "image"
+title = "sharma electricals banner"
 
 [[outputs]]
 id = "9lAjrQOwshUh8NexlfjnN"

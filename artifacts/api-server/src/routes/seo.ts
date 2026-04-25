@@ -313,7 +313,7 @@ router.get("/og/:slug.png", async (req, res) => {
 
   <!-- Footer URL -->
   <text x="60" y="585" font-family="Arial, sans-serif" font-size="20" font-weight="500"
-        fill="rgba(255,255,255,0.7)">sevu.in/profile/${svgEscape(slug)}</text>
+        fill="rgba(255,255,255,0.7)">${svgEscape(publicOrigin(req).replace(/^https?:\/\//, ""))}/profile/${svgEscape(slug)}</text>
 
   ${profile.priceRange ? `
   <text x="1140" y="585" font-family="Arial, sans-serif" font-size="20" font-weight="700"
@@ -343,6 +343,123 @@ router.get("/og/:slug.png", async (req, res) => {
     // Fail silently with a tiny transparent PNG so social cards don't break
     res.status(500).send("OG render failed");
   }
+});
+
+// ── Crawler SSR for /profile/:slug ──────────────────────────────────────
+// Returns a minimal HTML document with og:image, og:title, og:description,
+// twitter:* and JSON-LD pre-baked, so social-media crawlers (which do NOT
+// execute JavaScript) get a proper preview card instead of the bare SPA
+// shell. The Vite dev proxy and any production CDN should route requests
+// to this endpoint only when the User-Agent matches a known crawler.
+router.get("/seo/profile/:slug", async (req, res) => {
+  const slug = req.params.slug;
+  if (!slug || slug.length > 200) {
+    res.status(400).send("Invalid slug");
+    return;
+  }
+
+  const [profile] = await db
+    .select()
+    .from(profilesTable)
+    .where(eq(profilesTable.slug, slug));
+
+  if (!profile) {
+    res.status(404).type("html").send(
+      `<!doctype html><meta charset="utf-8"><title>Not found</title>`,
+    );
+    return;
+  }
+
+  const origin = publicOrigin(req);
+  const url = `${origin}/profile/${profile.slug}`;
+  const ratingTxt =
+    profile.totalReviews > 0
+      ? `★ ${Number(profile.rating).toFixed(1)} (${profile.totalReviews} reviews) · `
+      : "";
+  const title = `${profile.name} — ${profile.service} in ${profile.city} | Sevu`;
+  const description = profile.description
+    ? `${ratingTxt}${profile.description.slice(0, 150)}`
+    : `${ratingTxt}Book ${profile.name} for ${profile.service} services in ${profile.city}. Call or WhatsApp now.`;
+  const image = `${origin}/api/og/${profile.slug}.png`;
+
+  const esc = (s: string) =>
+    String(s ?? "").replace(/[&<>"']/g, (c) =>
+      c === "&" ? "&amp;" :
+      c === "<" ? "&lt;" :
+      c === ">" ? "&gt;" :
+      c === '"' ? "&quot;" :
+      "&#39;",
+    );
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "@id": url,
+    name: profile.name,
+    url,
+    image,
+    telephone: `+91${profile.phone}`,
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: profile.city,
+      addressRegion: profile.city,
+      addressCountry: "IN",
+      streetAddress: profile.address || undefined,
+    },
+    aggregateRating:
+      profile.totalReviews > 0
+        ? {
+            "@type": "AggregateRating",
+            ratingValue: Number(profile.rating).toFixed(1),
+            reviewCount: profile.totalReviews,
+          }
+        : undefined,
+    priceRange: profile.priceRange || undefined,
+    description: profile.description || undefined,
+  };
+
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>${esc(title)}</title>
+  <meta name="description" content="${esc(description)}" />
+  <link rel="canonical" href="${esc(url)}" />
+
+  <!-- Open Graph (WhatsApp, Facebook, LinkedIn) -->
+  <meta property="og:type" content="profile" />
+  <meta property="og:site_name" content="Sevu" />
+  <meta property="og:title" content="${esc(title)}" />
+  <meta property="og:description" content="${esc(description)}" />
+  <meta property="og:url" content="${esc(url)}" />
+  <meta property="og:image" content="${esc(image)}" />
+  <meta property="og:image:secure_url" content="${esc(image)}" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="${esc(profile.name)} — ${esc(profile.service)} in ${esc(profile.city)}" />
+  <meta property="og:locale" content="en_IN" />
+
+  <!-- Twitter / X -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${esc(title)}" />
+  <meta name="twitter:description" content="${esc(description)}" />
+  <meta name="twitter:image" content="${esc(image)}" />
+
+  <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+</head>
+<body>
+  <h1>${esc(profile.name)}</h1>
+  <p>${esc(profile.service)} in ${esc(profile.city)}</p>
+  ${profile.description ? `<p>${esc(profile.description)}</p>` : ""}
+  <p><a href="${esc(url)}">View full profile on Sevu</a></p>
+</body>
+</html>`;
+
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=600, s-maxage=3600");
+  res.setHeader("X-Robots-Tag", "all");
+  res.send(html);
 });
 
 export default router;
