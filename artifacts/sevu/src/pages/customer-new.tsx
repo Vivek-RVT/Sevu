@@ -122,47 +122,50 @@ export default function CustomerNew() {
       notes: notes.trim() || undefined,
     };
 
-    // Navigate first — instant, no waiting on the network.
-    setLocation("/app/customers");
+    // Fire the POST request FIRST so it's already in flight by the time
+    // the customers list mounts and tries to refetch. This prevents the
+    // race where a mount-time refetch returns the old list (without the
+    // new customer) and wipes out our optimistic entry.
+    createCustomer.mutate(
+      { data: payload },
+      {
+        onSuccess: (real) => {
+          // Replace the temp entry in every customers cache slot with the real one.
+          // If a racing refetch wiped the cache, ensure the new customer is still added.
+          queryClient.setQueriesData<Customer[]>(
+            { queryKey: ["/api/customers"] },
+            old => {
+              const list = old ?? [];
+              const hasTemp = list.some(c => c.id === tempId);
+              if (hasTemp) {
+                return list.map(c => c.id === tempId ? (real as Customer) : c);
+              }
+              if (list.some(c => c.phone === (real as Customer).phone)) return list;
+              return [real as Customer, ...list];
+            },
+          );
+          // Force a fresh fetch on the customers list (which the user just
+          // navigated to) AND on the dashboard so their data is consistent
+          // with the server. This cancels any stale in-flight requests.
+          queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+          queryClient.invalidateQueries({ queryKey: ["customers-dash"] });
+        },
+        onError: () => {
+          queryClient.setQueriesData<Customer[]>(
+            { queryKey: ["/api/customers"] },
+            old => (old ?? []).filter(c => c.id !== tempId),
+          );
+          queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+        },
+      }
+    );
 
-    // Fire the request after navigation so the form unmounts immediately
-    // and the user never sees a pending spinner.
-    queueMicrotask(() => {
-      createCustomer.mutate(
-        { data: payload },
-        {
-          onSuccess: (real) => {
-            // Replace the temp entry in every customers cache slot with the real one.
-            // If a racing refetch wiped the cache, ensure the new customer is still added.
-            queryClient.setQueriesData<Customer[]>(
-              { queryKey: ["/api/customers"] },
-              old => {
-                const list = old ?? [];
-                const hasTemp = list.some(c => c.id === tempId);
-                if (hasTemp) {
-                  return list.map(c => c.id === tempId ? (real as Customer) : c);
-                }
-                if (list.some(c => c.phone === (real as Customer).phone)) return list;
-                return [real as Customer, ...list];
-              },
-            );
-            // Force a fresh fetch on the customers list (which the user just
-            // navigated to) AND on the dashboard so their data is consistent
-            // with the server. This cancels any stale in-flight requests.
-            queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
-            queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-            queryClient.invalidateQueries({ queryKey: ["customers-dash"] });
-          },
-          onError: () => {
-            queryClient.setQueriesData<Customer[]>(
-              { queryKey: ["/api/customers"] },
-              old => (old ?? []).filter(c => c.id !== tempId),
-            );
-            queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
-          },
-        }
-      );
-    });
+    // Now navigate — the form unmounts immediately, the customers list
+    // page mounts and shows the optimistic entry from the cache (which
+    // is fresh because we just set it), and the in-flight POST will
+    // resolve and replace the temp entry with the real one.
+    setLocation("/app/customers");
   };
 
   return (

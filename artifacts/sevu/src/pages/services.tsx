@@ -94,12 +94,27 @@ export default function Services() {
 
   const { data: logs = [], isLoading } = useListServiceLogs(
     { businessId: safeBusinessId },
-    { query: { staleTime: 0, refetchOnMount: "always", refetchOnWindowFocus: true } },
+    {
+      query: {
+        // Trust freshly-injected optimistic entries for 30s so the
+        // newly-added log isn't wiped by a mount-time / focus refetch
+        // that races with the still-pending POST.
+        staleTime: 30_000,
+        refetchOnMount: true,
+        refetchOnWindowFocus: true,
+      },
+    },
   );
 
   const { data: customers = [], isLoading: customersLoading } = useListCustomers(
     { businessId: safeBusinessId },
-    { query: { enabled: safeBusinessId > 0, staleTime: 0, refetchOnMount: "always" } },
+    {
+      query: {
+        enabled: safeBusinessId > 0,
+        staleTime: 30_000,
+        refetchOnMount: true,
+      },
+    },
   );
 
   const createLog = useMutation({

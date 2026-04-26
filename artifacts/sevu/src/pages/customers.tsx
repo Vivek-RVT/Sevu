@@ -70,7 +70,17 @@ export default function Customers() {
 
   const { data: customers = [], isLoading } = useListCustomers(
     { businessId, search: debouncedSearch || undefined },
-    { query: { staleTime: 0, refetchOnMount: "always", refetchOnWindowFocus: true } },
+    {
+      query: {
+        // Treat data as fresh for 30s so a freshly-injected optimistic entry
+        // (from /app/customers/new) isn't immediately wiped by a mount-time
+        // refetch that races with the still-pending POST.
+        staleTime: 30_000,
+        // Only refetch on mount if the cache is actually stale.
+        refetchOnMount: true,
+        refetchOnWindowFocus: true,
+      },
+    },
   );
 
   const visibleCustomers = activeTag === "All"
