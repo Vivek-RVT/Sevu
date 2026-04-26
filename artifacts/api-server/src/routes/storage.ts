@@ -3,14 +3,25 @@ import { Readable } from "stream";
 import path from "path";
 import { db } from "@workspace/db";
 import { businessImagesTable } from "@workspace/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth.js";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { validate } from "../middleware/validate.js";
 import {
   RequestUploadUrlBody,
   type RequestUploadUrlBodyType,
+  SaveImageBody,
+  type SaveImageBodyType,
+  STORAGE_QUOTA_BYTES,
 } from "../validators/storage.schema.js";
+
+async function getBusinessUsageBytes(businessId: number): Promise<number> {
+  const [row] = await db
+    .select({ total: sql<string>`COALESCE(SUM(${businessImagesTable.sizeBytes}), 0)` })
+    .from(businessImagesTable)
+    .where(eq(businessImagesTable.businessId, businessId));
+  return Number(row?.total ?? 0);
+}
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -64,6 +75,22 @@ router.post(
         return;
       }
       const { name, size, contentType } = req.validated.body as RequestUploadUrlBodyType;
+
+      // Soft pre-flight quota check based on client-supplied compressed size.
+      // The authoritative check happens again on POST /storage/images.
+      const used = await getBusinessUsageBytes(businessId);
+      if (used + size > STORAGE_QUOTA_BYTES) {
+        const usedMb = (used / (1024 * 1024)).toFixed(2);
+        const capMb = (STORAGE_QUOTA_BYTES / (1024 * 1024)).toFixed(0);
+        res.status(413).json({
+          error: "STORAGE_QUOTA_EXCEEDED",
+          message: `Storage full (${usedMb} MB of ${capMb} MB used). Purani photos delete karein ya plan upgrade karein.`,
+          usedBytes: used,
+          quotaBytes: STORAGE_QUOTA_BYTES,
+        });
+        return;
+      }
+
       const uploadURL = await objectStorageService.getObjectEntityUploadURL(businessId);
       const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
       res.json({ uploadURL, objectPath, metadata: { name, size, contentType } });
@@ -82,22 +109,64 @@ router.post(
 router.post(
   "/storage/images",
   requireAuth,
+  validate({ body: SaveImageBody }),
   async (req: Request, res: Response) => {
     const businessId = req.auth?.businessId;
     if (!businessId) {
       res.status(403).json({ error: "A linked business is required." });
       return;
     }
-    const { objectPath, type, isPublic } = req.body;
-    if (!objectPath) {
-      res.status(400).json({ error: "objectPath is required." });
+    const { objectPath, type, isPublic, sizeBytes } =
+      req.validated.body as SaveImageBodyType;
+
+    // Authoritative quota enforcement on persistence.
+    const used = await getBusinessUsageBytes(businessId);
+    const incoming = sizeBytes ?? 0;
+    if (used + incoming > STORAGE_QUOTA_BYTES) {
+      const usedMb = (used / (1024 * 1024)).toFixed(2);
+      const capMb = (STORAGE_QUOTA_BYTES / (1024 * 1024)).toFixed(0);
+      res.status(413).json({
+        error: "STORAGE_QUOTA_EXCEEDED",
+        message: `Storage full (${usedMb} MB of ${capMb} MB used). Purani photos delete karein ya plan upgrade karein.`,
+        usedBytes: used,
+        quotaBytes: STORAGE_QUOTA_BYTES,
+      });
       return;
     }
+
     const [image] = await db
       .insert(businessImagesTable)
-      .values({ businessId, objectPath, type: type || "general", isPublic: isPublic ?? false })
+      .values({
+        businessId,
+        objectPath,
+        type: type || "general",
+        isPublic: isPublic ?? false,
+        sizeBytes: incoming,
+      })
       .returning();
     res.status(201).json(image);
+  },
+);
+
+/**
+ * GET /storage/usage
+ * Returns the authenticated business's current storage usage and quota.
+ */
+router.get(
+  "/storage/usage",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    const businessId = req.auth?.businessId;
+    if (!businessId) {
+      res.status(403).json({ error: "A linked business is required." });
+      return;
+    }
+    const usedBytes = await getBusinessUsageBytes(businessId);
+    res.json({
+      usedBytes,
+      quotaBytes: STORAGE_QUOTA_BYTES,
+      percent: Math.min(100, Math.round((usedBytes / STORAGE_QUOTA_BYTES) * 100)),
+    });
   },
 );
 

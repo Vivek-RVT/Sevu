@@ -23,3 +23,17 @@ export const RequestUploadUrlBody = z
   })
   .strict();
 export type RequestUploadUrlBodyType = z.infer<typeof RequestUploadUrlBody>;
+
+/** POST /storage/images body. */
+export const SaveImageBody = z
+  .object({
+    objectPath: z.string().min(1, "objectPath is required"),
+    type: z.string().max(50).optional(),
+    isPublic: z.boolean().optional(),
+    sizeBytes: z.number().int().nonnegative().max(50 * 1024 * 1024).optional(),
+  })
+  .strict();
+export type SaveImageBodyType = z.infer<typeof SaveImageBody>;
+
+/** Per-business hard cap on total stored bytes (logos + banners + post images). */
+export const STORAGE_QUOTA_BYTES = 5 * 1024 * 1024;

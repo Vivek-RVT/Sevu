@@ -9,6 +9,7 @@ export const businessImagesTable = pgTable("business_images", {
   objectPath: text("object_path").notNull(),
   type: text("type").notNull().default("general"),
   isPublic: boolean("is_public").default(false).notNull(),
+  sizeBytes: integer("size_bytes").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => [
   index("business_images_business_id_idx").on(t.businessId),

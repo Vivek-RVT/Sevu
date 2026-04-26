@@ -6,11 +6,21 @@ type Options = {
   mimeType?: "image/jpeg" | "image/webp";
 };
 
+// Aggressive presets sized to keep total per-account storage under ~3 MB
+// even with banner + logo + many post images.
 const PRESETS: Record<Preset, Required<Options>> = {
-  logo:   { maxPx: 512,  quality: 0.82, mimeType: "image/jpeg" },
-  banner: { maxPx: 1280, quality: 0.78, mimeType: "image/jpeg" },
-  post:   { maxPx: 1280, quality: 0.78, mimeType: "image/jpeg" },
-  work:   { maxPx: 1200, quality: 0.78, mimeType: "image/jpeg" },
+  logo:   { maxPx: 384, quality: 0.78, mimeType: "image/jpeg" },
+  banner: { maxPx: 960, quality: 0.72, mimeType: "image/jpeg" },
+  post:   { maxPx: 900, quality: 0.70, mimeType: "image/jpeg" },
+  work:   { maxPx: 900, quality: 0.70, mimeType: "image/jpeg" },
+};
+
+// Per-preset target byte budget. If the first encode exceeds it, retry tighter.
+const TARGET_BYTES: Record<Preset, number> = {
+  logo:   60  * 1024,   // ~60 KB
+  banner: 220 * 1024,   // ~220 KB
+  post:   180 * 1024,   // ~180 KB
+  work:   180 * 1024,
 };
 
 function loadImage(file: File): Promise<HTMLImageElement> {
@@ -67,11 +77,16 @@ export async function compressImage(file: File, preset: Preset, opts?: Options):
   if (!result) return file;
 
   let { blob } = result;
-  if (blob.size > 600 * 1024) {
-    const tighter = await encode(img, Math.min(maxPx, 1024), mimeType, Math.max(0.65, quality - 0.1));
-    if (tighter && tighter.blob.size < blob.size) {
-      blob = tighter.blob;
-    }
+  const target = TARGET_BYTES[preset];
+
+  // Two-step retry to bring size down to budget if first pass overshoots.
+  if (blob.size > target) {
+    const tighter = await encode(img, Math.round(maxPx * 0.85), mimeType, Math.max(0.6, quality - 0.08));
+    if (tighter && tighter.blob.size < blob.size) blob = tighter.blob;
+  }
+  if (blob.size > target) {
+    const tightest = await encode(img, Math.round(maxPx * 0.7), mimeType, 0.55);
+    if (tightest && tightest.blob.size < blob.size) blob = tightest.blob;
   }
 
   if (blob.size >= file.size) return file;

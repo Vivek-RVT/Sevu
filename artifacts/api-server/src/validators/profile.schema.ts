@@ -1,15 +1,23 @@
 import { z } from "zod";
 import {
   CreateProfileBody,
-  UpdateProfileBody,
+  UpdateProfileBody as GeneratedUpdateProfileBody,
   ListProfilesQueryParams,
   AddProfileReviewBody,
 } from "@workspace/api-zod";
 import { slugParamSchema } from "./common.schema.js";
 
+/**
+ * Extends the generated UpdateProfileBody with `shopImage` (banner image),
+ * which exists in the DB schema but is missing from the OpenAPI spec.
+ * Without this, banner uploads silently fail with "No values to set".
+ */
+export const UpdateProfileBody = GeneratedUpdateProfileBody.extend({
+  shopImage: z.string().optional(),
+}).strict();
+
 export {
   CreateProfileBody,
-  UpdateProfileBody,
   AddProfileReviewBody,
 };
 export { slugParamSchema as ProfileSlugParam };

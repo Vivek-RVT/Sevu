@@ -163,8 +163,16 @@ export default function Analytics() {
   const [uploadingProfile, setUploadingProfile] = useState(false);
   const [uploadingShop, setUploadingShop] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const profileInput = useRef<HTMLInputElement>(null);
   const shopInput = useRef<HTMLInputElement>(null);
+
+  // Auto-dismiss success toast after 2.5s
+  useEffect(() => {
+    if (!uploadSuccess) return;
+    const t = setTimeout(() => setUploadSuccess(null), 2500);
+    return () => clearTimeout(t);
+  }, [uploadSuccess]);
 
   // ── Posts (carousel posts of work) ─────────────────────────────
   const { data: posts = [] } = useQuery<ProfilePost[]>({
@@ -198,8 +206,9 @@ export default function Analytics() {
     onSuccess: async (res: any) => {
       try {
         const url = toPublicUrl(res.objectPath);
-        await saveImageRecord(res.objectPath, "post");
+        await saveImageRecord(res.objectPath, "post", lastPostSize.current);
         setPostImages(prev => prev.length >= 2 ? prev : [...prev, url]);
+        setUploadSuccess("Photo added!");
       } catch (err: any) {
         setUploadError(err?.message || "Image upload failed.");
       } finally {
@@ -222,6 +231,7 @@ export default function Analytics() {
     }
     setPostImgUploading(true);
     const compressed = await compressImage(file, "post");
+    lastPostSize.current = compressed.size;
     await postImgUpload.uploadFile(compressed);
   };
 
@@ -275,11 +285,15 @@ export default function Analytics() {
 
   const patchProfile = async (fields: Record<string, unknown>) => {
     if (!slug) return;
-    await fetch(`/api/profiles/${slug}`, {
+    const res = await fetch(`/api/profiles/${slug}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(fields),
     });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({} as any));
+      throw new Error(body?.message || body?.error || "Profile update failed");
+    }
     queryClient.invalidateQueries({ queryKey: ["my-profile", businessId] });
     queryClient.invalidateQueries({ queryKey: ["profile", slug] });
     queryClient.invalidateQueries({ queryKey: ["analytics", slug] });
@@ -299,21 +313,34 @@ export default function Analytics() {
     }
   };
 
-  const saveImageRecord = (objectPath: string, type: string) =>
-    fetch("/api/storage/images", {
+  const saveImageRecord = async (objectPath: string, type: string, sizeBytes: number) => {
+    const r = await fetch("/api/storage/images", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ objectPath, type, isPublic: true }),
-    }).catch(() => {});
+      body: JSON.stringify({ objectPath, type, isPublic: true, sizeBytes }),
+    });
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({} as any));
+      throw new Error(body?.message || body?.error || "Failed to save image record");
+    }
+    queryClient.invalidateQueries({ queryKey: ["storage-usage", businessId] });
+    return r.json();
+  };
+
+  // Track size of last compressed file per upload slot so we can pass to saveImageRecord.
+  const lastProfileSize = useRef(0);
+  const lastShopSize = useRef(0);
+  const lastPostSize = useRef(0);
 
   const profileUpload = useUpload({
     onSuccess: async (res) => {
       try {
         const url = toPublicUrl(res.objectPath);
-        await saveImageRecord(res.objectPath, "profile");
+        await saveImageRecord(res.objectPath, "profile", lastProfileSize.current);
         await patchProfile({ profileImage: url });
+        setUploadSuccess("Logo updated!");
       } catch (err: any) {
-        setUploadError(err?.message || "Image saved but couldn't update profile.");
+        setUploadError(err?.message || "Logo upload failed.");
       } finally {
         setUploadingProfile(false);
       }
@@ -328,10 +355,11 @@ export default function Analytics() {
     onSuccess: async (res) => {
       try {
         const url = toPublicUrl(res.objectPath);
-        await saveImageRecord(res.objectPath, "shop");
+        await saveImageRecord(res.objectPath, "shop", lastShopSize.current);
         await patchProfile({ shopImage: url });
+        setUploadSuccess("Banner updated!");
       } catch (err: any) {
-        setUploadError(err?.message || "Image saved but couldn't update profile.");
+        setUploadError(err?.message || "Banner upload failed.");
       } finally {
         setUploadingShop(false);
       }
@@ -353,6 +381,7 @@ export default function Analytics() {
     if (!file) return;
     setUploadingProfile(true);
     const compressed = await compressImage(file, "logo");
+    lastProfileSize.current = compressed.size;
     await profileUpload.uploadFile(compressed);
   };
 
@@ -362,6 +391,7 @@ export default function Analytics() {
     if (!file) return;
     setUploadingShop(true);
     const compressed = await compressImage(file, "banner");
+    lastShopSize.current = compressed.size;
     await shopUpload.uploadFile(compressed);
   };
 
@@ -408,6 +438,16 @@ export default function Analytics() {
                   <p className="text-xs text-destructive/80 mt-0.5 break-words">{uploadError}</p>
                 </div>
                 <button onClick={() => setUploadError(null)} className="text-destructive/70 hover:text-destructive">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {uploadSuccess && (
+              <div className="mx-4 mt-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 flex items-center gap-2.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 flex-1">{uploadSuccess}</p>
+                <button onClick={() => setUploadSuccess(null)} className="text-emerald-600/70 hover:text-emerald-700">
                   <X className="w-4 h-4" />
                 </button>
               </div>
